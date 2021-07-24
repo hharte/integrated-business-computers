@@ -1,0 +1,30 @@
+; SIMH/AltairZ80 Configuration file for the IBC Multistar
+;
+set cpu 64k
+set cpu itrap
+set cpu z80
+set cpu noaltairrom
+set hdsk disable
+set dsk disable
+set debug stdout
+
+; Configure serial port for 6850 UART port 1.
+set sio ansi
+set sio port=00/0/01/00/02/F/00/F
+set sio port=01/0/00/00/00/F/00/T
+
+; Enable WD1793-based IBC MCC Disk Controller
+set wd179x enable
+set ibc_mcc enable
+;set ibc_mcc debug
+
+; Attach to OASIS 5.6 Boot Disk
+attach ibc_mcc0 IBC_MIDDI_CADET_OASIS56.imd
+
+set wd179x debug
+set wd179x iobase=0x24
+
+deposit dipswe 0x04
+echo Press ESC to get into the monitor.
+reset
+g 0
