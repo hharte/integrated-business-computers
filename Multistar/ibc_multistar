@@ -12,11 +12,29 @@ set debug stdout
 set sio ansi
 set sio port=00/0/01/00/02/F/00/F
 set sio port=01/0/00/00/00/F/00/T
+set sio port=02/1/01/00/02/F/00/F
+set sio port=03/1/00/00/00/F/00/T
+set sio port=04/2/01/00/02/F/00/F
+set sio port=05/2/00/00/00/F/00/T
+set sio port=06/3/01/00/02/F/00/F
+set sio port=07/3/00/00/00/F/00/T
+set sio port=08/4/01/00/02/F/00/F
+set sio port=09/4/00/00/00/F/00/T
+set sio port=0a/5/01/00/02/F/00/F
+set sio port=0b/5/00/00/00/F/00/T
+set sio port=0c/6/01/00/02/F/00/F
+set sio port=0d/6/00/00/00/F/00/T
+set sio port=0e/7/01/00/02/F/00/F
+set sio port=0f/7/00/00/00/F/00/T
+set sio port=10/8/01/00/02/F/00/F
+set sio port=11/8/00/00/00/F/00/T
+set sio port=12/9/01/00/02/F/00/F
+set sio port=13/9/00/00/00/F/00/T
 
 ; Enable WD1793-based IBC MCC Disk Controller
 set wd179x enable
 set ibc_mcc enable
-;set ibc_mcc debug
+set ibc_mcc debug=ERROR;SBD
 
 ; Attach to OASIS 5.6 Boot Disk
 attach ibc_mcc0 IBC_MIDDI_CADET_OASIS56.imd
@@ -24,7 +42,7 @@ attach ibc_mcc0 IBC_MIDDI_CADET_OASIS56.imd
 set wd179x debug
 set wd179x iobase=0x24
 
-deposit dipswe 0x04
+deposit dipswe 0xfe
 echo Press ESC to get into the monitor.
 reset
 g 0
