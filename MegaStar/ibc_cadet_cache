@@ -1,0 +1,85 @@
+; SIMH/AltairZ80 Configuration file for the IBC Cadet with CACHE.
+;
+set cpu 1M
+set cpu banked
+set cpu itrap
+set cpu z80
+set cpu noaltairrom
+set hdsk disable
+set dsk disable
+set cpu looponhalt
+set debug stdout
+
+; Set up banked memory: IBC Bank Select
+d cpu commonlow 1
+d cpu common 4000
+
+; Configure 6850 UART for ports 1-10.
+set sio ansi
+set sio verbose
+set sio nosleep
+set sio port=00/0/01/00/02/F/00/F
+set sio port=01/0/00/00/00/F/00/T
+set sio port=02/1/01/00/02/F/00/F
+set sio port=03/1/00/00/00/F/00/T
+set sio port=04/2/01/00/02/F/00/F
+set sio port=05/2/00/00/00/F/00/T
+set sio port=06/3/01/00/02/F/00/F
+set sio port=07/3/00/00/00/F/00/T
+set sio port=08/4/01/00/02/F/00/F
+set sio port=09/4/00/00/00/F/00/T
+set sio port=0a/5/01/00/02/F/00/F
+set sio port=0b/5/00/00/00/F/00/T
+set sio port=0c/6/01/00/02/F/00/F
+set sio port=0d/6/00/00/00/F/00/T
+set sio port=0e/7/01/00/02/F/00/F
+set sio port=0f/7/00/00/00/F/00/T
+set sio port=10/8/01/00/02/F/00/F
+set sio port=11/8/00/00/00/F/00/T
+set sio port=12/9/01/00/02/F/00/F
+set sio port=13/9/00/00/00/F/00/T
+
+; Super Cadet Ports 11-16
+set sio port=2c/9/01/00/02/F/00/F
+set sio port=2d/9/00/00/00/F/00/T
+set sio port=2e/9/01/00/02/F/00/F
+set sio port=2f/9/00/00/00/F/00/T
+set sio port=30/9/01/00/02/F/00/F
+set sio port=31/9/00/00/00/F/00/T
+set sio port=32/9/01/00/02/F/00/F
+set sio port=33/9/00/00/00/F/00/T
+set sio port=34/9/01/00/02/F/00/F
+set sio port=35/9/00/00/00/F/00/T
+set sio port=36/9/01/00/02/F/00/F
+set sio port=37/9/00/00/00/F/00/T
+
+; Enable keyboard interrupt for console SIO.
+d irqhack 1
+set sio interrupt
+
+; Enable WD1793-based IBC MCC Disk Controller
+set wd179x enable
+set ibc_mcc debug=ERROR;VERBOSE
+set ibc_mcc enable
+
+; Attach to OASIS 5.6 Boot Disk
+attach ibc_mcc0 OASIS_MU_OS_M5_6A_IBC_CADET_CACHE.imd
+
+set wd179x debug=ERROR	;READ;WRITE ;IMD
+set wd179x iobase=0x24
+deposit fdctype 1795
+
+; IBC Timer
+set ibctimer debug
+
+set ibcsmd debug
+set ibcsmd en
+set ibcsmd0 geometry=C:512/H:4/S:32/N:256
+set ibcsmd1 geometry=C:512/H:4/S:32/N:256
+attach ibcsmd0 IBCSC20MB.dsk
+
+deposit dipswe 0xff
+
+echo Press ESC to get into the monitor.
+reset
+g 0
