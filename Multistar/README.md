@@ -1,22 +1,21 @@
+
 # IBC/Integrated Business Computers - MultiStar
 
 
 # IBC MultiStar* SERIES   Loader PROM  V3.4
 
-To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and press ESC on any one of the 10 serial ports.  Signs on with:
+To get into the Loader PROM monitor, set DIP Switch E position 1 to ON, and press ESC on any one of the 10 serial ports.  Signs on with:
 
 
 <table>
   <tr>
-   <td>Command
+   <td><strong><em>Command</em></strong>
    </td>
-   <td>Argument
+   <td><strong><em>Argument</em></strong>
    </td>
-   <td>Description
+   <td><strong><em>Description</em></strong>
    </td>
-   <td>Address
-   </td>
-   <td>Notes
+   <td><strong><em>Notes</em></strong>
    </td>
   </tr>
   <tr>
@@ -28,8 +27,6 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    </td>
    <td>
    </td>
-   <td>
-   </td>
   </tr>
   <tr>
    <td>OU
@@ -37,8 +34,6 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    <td>&lt;port> &lt;data>
    </td>
    <td>Output to Port
-   </td>
-   <td>0x05d5
    </td>
    <td>
    </td>
@@ -50,8 +45,6 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    </td>
    <td>Continuous Input
    </td>
-   <td>0x05df
-   </td>
    <td>Continuous read from I/O port until ESC is pressed.
    </td>
   </tr>
@@ -61,8 +54,6 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    <td>&lt;port>
    </td>
    <td>Continuous Output
-   </td>
-   <td>
    </td>
    <td>Continuous write to I/O port until ESC is pressed.
    </td>
@@ -74,8 +65,6 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    </td>
    <td>Fill Buffer
    </td>
-   <td>0x05ff
-   </td>
    <td>Fills memory from 8000-9A00 with specified byte.
    </td>
   </tr>
@@ -84,9 +73,7 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    </td>
    <td>none
    </td>
-   <td>Fill Increment
-   </td>
-   <td>0x060f
+   <td>Fill Incrementing
    </td>
    <td>Fills memory from 8000-9A00 with an incrementing pattern 0-255.
    </td>
@@ -96,11 +83,9 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    </td>
    <td>none
    </td>
-   <td>
+   <td>Double Density
    </td>
-   <td>0x091f
-   </td>
-   <td>Set 0xE539 to 16
+   <td>Sets sectors per track to 26 for 8” and 16 for 5.25” (DIP Switch setting.)
    </td>
   </tr>
   <tr>
@@ -108,13 +93,11 @@ To get into the Loader PROM monitor, set DIP Switch E position 3 to OFF, and pre
    </td>
    <td>none
    </td>
-   <td>
+   <td>Single Density
    </td>
-   <td>0x0631
-   </td>
-   <td>Set 0xE539 to 13
+   <td>Sets sectors per track to 26.
 <p>
-Works when DIP switch set to 0x44, not 0x04.
+Available only with 8” Disk Drive DIP Switch setting.
    </td>
   </tr>
   <tr>
@@ -126,8 +109,6 @@ Works when DIP switch set to 0x44, not 0x04.
 <p>
 Writes 1 to 0E41Ch
    </td>
-   <td>0x0637
-   </td>
    <td>
    </td>
   </tr>
@@ -138,8 +119,6 @@ Writes 1 to 0E41Ch
    </td>
    <td>Status
    </td>
-   <td>0x063b
-   </td>
    <td>Returns FDC Status from 1795 and PARAM register from 0x2A.
    </td>
   </tr>
@@ -148,11 +127,11 @@ Writes 1 to 0E41Ch
    </td>
    <td>none
    </td>
-   <td>Writes 1 to 0E420h
+   <td>Head 1
    </td>
-   <td>0x0654
-   </td>
-   <td>
+   <td>Select Floppy Head 1
+<p>
+Writes 1 to 0E420h
    </td>
   </tr>
   <tr>
@@ -160,11 +139,11 @@ Writes 1 to 0E41Ch
    </td>
    <td>none
    </td>
-   <td>Writes 0 to 0E420h
+   <td>Head 0
    </td>
-   <td>0x0658
-   </td>
-   <td>
+   <td>Select Floppy Head 0
+<p>
+Writes 0 to 0E420h
    </td>
   </tr>
   <tr>
@@ -173,8 +152,6 @@ Writes 1 to 0E41Ch
    <td>&lt;0,1,2,3>
    </td>
    <td>Unit Select
-   </td>
-   <td>0x065d
    </td>
    <td>Floppy Drive Select: 0-3
    </td>
@@ -186,8 +163,6 @@ Writes 1 to 0E41Ch
    </td>
    <td>Read Floppy Track
    </td>
-   <td>
-   </td>
    <td>Track range: 0-78
    </td>
   </tr>
@@ -198,8 +173,6 @@ Writes 1 to 0E41Ch
    </td>
    <td>Continuous Read Floppy Track
    </td>
-   <td>
-   </td>
    <td>Track range: 0-78
    </td>
   </tr>
@@ -208,11 +181,9 @@ Writes 1 to 0E41Ch
    </td>
    <td>none
    </td>
-   <td>Read (verify) different floppy tracks.
-   </td>
    <td>
    </td>
-   <td>
+   <td>Read (verify) different floppy tracks, press ESC to stop.
    </td>
   </tr>
   <tr>
@@ -221,8 +192,6 @@ Writes 1 to 0E41Ch
    <td>&lt;track>
    </td>
    <td>Write floppy sector
-   </td>
-   <td>
    </td>
    <td>Track range: 0-78
    </td>
@@ -233,8 +202,6 @@ Writes 1 to 0E41Ch
    <td>&lt;track>
    </td>
    <td>Continuous Write
-   </td>
-   <td>
    </td>
    <td>Track range: 0-78
    </td>
@@ -248,8 +215,6 @@ Writes 1 to 0E41Ch
    </td>
    <td>
    </td>
-   <td>
-   </td>
   </tr>
   <tr>
    <td>SM
@@ -257,8 +222,6 @@ Writes 1 to 0E41Ch
    <td>&lt;addr> &lt;data>
    </td>
    <td>Set memory
-   </td>
-   <td>
    </td>
    <td>
    </td>
@@ -270,8 +233,6 @@ Writes 1 to 0E41Ch
    </td>
    <td>Boot Floppy
    </td>
-   <td>0x15e
-   </td>
    <td>
    </td>
   </tr>
@@ -281,8 +242,6 @@ Writes 1 to 0E41Ch
    <td>none
    </td>
    <td>Boot SMD Hard Disk
-   </td>
-   <td>0x02f7
    </td>
    <td>
    </td>
@@ -294,8 +253,6 @@ Writes 1 to 0E41Ch
    </td>
    <td>Set SIO?
    </td>
-   <td>0x0768
-   </td>
    <td>Allows the user to choose another UART by pressing ESC.
    </td>
   </tr>
@@ -304,11 +261,9 @@ Writes 1 to 0E41Ch
    </td>
    <td>none
    </td>
-   <td>??
+   <td>Hard Disk Diags
    </td>
-   <td>0x077a
-   </td>
-   <td>
+   <td>IBC DIAGNOSTICS - DISK SLAVE V4.0
    </td>
   </tr>
   <tr>
@@ -318,12 +273,36 @@ Writes 1 to 0E41Ch
    </td>
    <td>Start execution at address.
    </td>
-   <td>
-   </td>
-   <td>Works when the DIP switch is set to 0x44, not 0x04.
+   <td>Available only with 8” Disk Drive DIP Switch setting.
    </td>
   </tr>
 </table>
+
+
+
+## Memory Test
+
+The loader PROM contains a RAM memory test, which is invoked in any of the following ways:
+
+
+
+1. In case of an NMI interrupt.
+2. Setting DIP Switch E position 3 to ON.
+3. Using the “GO0066” monitor command to jump to the NMI vector address. 
+
+The memory test signs on with:
+
+
+```
+Memory Parity Error!!! (ESC or M)
+
+IBC MIDDI-CADET Memory Test
+test # 0 - cell test
+test # 1 - row/column sensitivity test
+select test (0,1 or A<all>)? A
+
+which bank to select (0-9 or A<all>)? A
+```
 
 
 
@@ -346,6 +325,720 @@ Writes 1 to 0E41Ch
 0x8000-0x9A00 - Memory buffer used for Disk I/O (26 sectors of 128 bytes each.)  This is enough for one track worth of data.
 
 
+# IBC DIAGNOSTICS - DISK SLAVE V4.0
+
+
+<table>
+  <tr>
+   <td><strong><em>Command</em></strong>
+   </td>
+   <td><strong><em>Argument</em></strong>
+   </td>
+   <td><strong><em>Description</em></strong>
+   </td>
+   <td><strong><em>Notes</em></strong>
+   </td>
+  </tr>
+  <tr>
+   <td>IN
+   </td>
+   <td>&lt;port>
+   </td>
+   <td>Input from Port
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>OU
+   </td>
+   <td>&lt;port> &lt;data>
+   </td>
+   <td>Output to Port
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>CI
+   </td>
+   <td>&lt;port>
+   </td>
+   <td>Continuous Input
+   </td>
+   <td>Continuous read from I/O port until ESC is pressed.
+   </td>
+  </tr>
+  <tr>
+   <td>CO
+   </td>
+   <td>&lt;port> &lt;data>
+   </td>
+   <td>Continuous Output
+   </td>
+   <td>Continuous write to I/O port until ESC is pressed.
+   </td>
+  </tr>
+  <tr>
+   <td>FB
+   </td>
+   <td>&lt;addr> &lt;byte>
+   </td>
+   <td>Fill Buffer
+   </td>
+   <td>Fills memory with specified byte.
+   </td>
+  </tr>
+  <tr>
+   <td>FI
+   </td>
+   <td>&lt;addr>
+   </td>
+   <td>Fill Incrementing
+   </td>
+   <td>Fills memory with an incrementing pattern 0-255.
+   </td>
+  </tr>
+  <tr>
+   <td>WI
+   </td>
+   <td>&lt;hh> &lt;cccc> &lt;ss>
+   </td>
+   <td>Write Incrementing
+   </td>
+   <td>Write Incrementing Pattern to disk at &lt;hh> &lt;cccc> &lt;ss> (Must be formatted.)
+   </td>
+  </tr>
+  <tr>
+   <td>DM
+   </td>
+   <td>&lt;addr>
+   </td>
+   <td>Display Memory
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>SM
+   </td>
+   <td>&lt;addr> &lt;data>
+   </td>
+   <td>Set memory
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>RD
+   </td>
+   <td>&lt;head> &lt;track> &lt;sector>
+   </td>
+   <td>Read Disk
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>WR
+   </td>
+   <td>&lt;head> &lt;track> &lt;sector> &lt;data>
+   </td>
+   <td>Write Disk
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>HM
+   </td>
+   <td>none
+   </td>
+   <td>Home
+   </td>
+   <td>Homes drives 0,1
+   </td>
+  </tr>
+  <tr>
+   <td>SL
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+   <td>Echoes characters to the serial port until ESC is pressed.
+   </td>
+  </tr>
+  <tr>
+   <td>F0
+   </td>
+   <td>none
+   </td>
+   <td>Format Track 0?
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>FM
+   </td>
+   <td>&lt;head>
+   </td>
+   <td>Format Disk
+   </td>
+   <td>Nn appears to affect sector size.
+<p>
+00 or 01 = 256
+<p>
+02 or 03 = 512
+<p>
+04 or 05 = 1024
+<p>
+06 or 07 = 128
+   </td>
+  </tr>
+  <tr>
+   <td>ID
+   </td>
+   <td>&lt;head> &lt;track>
+   </td>
+   <td>Read ID
+   </td>
+   <td>A1FE020018A1F8
+   </td>
+  </tr>
+  <tr>
+   <td>CA
+   </td>
+   <td>none
+   </td>
+   <td>Calls 011DH in a loop until ESC is pressed.
+   </td>
+   <td>Press ESC to exit
+   </td>
+  </tr>
+  <tr>
+   <td>SC
+   </td>
+   <td>&lt;drive>
+   </td>
+   <td>Set Configuration
+   </td>
+   <td>Sets heads, tracks, wpc (in HEX)
+<p>
+Ie:
+<p>
+SC 00
+<p>
+04
+<p>
+0267
+<p>
+1000
+   </td>
+  </tr>
+  <tr>
+   <td>BU
+   </td>
+   <td>&lt;aa> &lt;bbbb> &lt;cccc>
+   </td>
+   <td>(Tape)
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>RS
+   </td>
+   <td>&lt;aa> &lt;bbbb> &lt;cccc>
+   </td>
+   <td>Read Status?
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>GL
+   </td>
+   <td>
+   </td>
+   <td>(Tape)
+   </td>
+   <td>Hangs
+   </td>
+  </tr>
+  <tr>
+   <td>DU
+   </td>
+   <td>
+   </td>
+   <td>(Disk/Tape)
+   </td>
+   <td>Hangs
+   </td>
+  </tr>
+  <tr>
+   <td>RT
+   </td>
+   <td>
+   </td>
+   <td>Read Tape?
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>WT
+   </td>
+   <td>
+   </td>
+   <td>Write Tape?
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>RW
+   </td>
+   <td>
+   </td>
+   <td>Rewind Tape?
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>US
+   </td>
+   <td>&lt;nn>
+   </td>
+   <td>Unit Select
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>QC
+   </td>
+   <td>&lt;drive> &lt;0-0C>
+   </td>
+   <td>Set Drive Parameters
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>DS
+   </td>
+   <td>none
+   </td>
+   <td>Disk Seek
+   </td>
+   <td>Seeks from the current cyl to 0, and back to the original cyl.
+   </td>
+  </tr>
+  <tr>
+   <td>TM
+   </td>
+   <td>
+   </td>
+   <td>(Tape)
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>NE
+   </td>
+   <td>none
+   </td>
+   <td>
+   </td>
+   <td>Writes 0 to 2D18H
+   </td>
+  </tr>
+  <tr>
+   <td>XT
+   </td>
+   <td>none
+   </td>
+   <td>eXiT
+   </td>
+   <td>SP=3000H and Reinit (hangs)
+   </td>
+  </tr>
+  <tr>
+   <td>SV
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+  </tr>
+</table>
+
+
+
+# I/O Ports
+
+
+<table>
+  <tr>
+   <td><strong><em>I/O Port Range</em></strong>
+   </td>
+   <td><strong><em>Description</em></strong>
+   </td>
+  </tr>
+  <tr>
+   <td>0x00-0x13
+   </td>
+   <td>UART1-10
+   </td>
+  </tr>
+  <tr>
+   <td>0x14
+   </td>
+   <td>Timer Tick?
+<p>
+Read = Clear Interrupt/Disable
+<p>
+Write = Countdown (written to 0xfe)
+   </td>
+  </tr>
+  <tr>
+   <td>0x20
+   </td>
+   <td>1 written at 0x9f (Causes NMI.) Other bits have no effect.  Maybe MMU?
+<p>
+DIP Switch position 8=ON writes 1 to this register.
+   </td>
+  </tr>
+  <tr>
+   <td>0x24-0x27
+   </td>
+   <td>WD1795 FDC Controller
+   </td>
+  </tr>
+  <tr>
+   <td>0x28
+   </td>
+   <td>FDC Data FIFO
+   </td>
+  </tr>
+  <tr>
+   <td>0x29
+   </td>
+   <td>?
+   </td>
+  </tr>
+  <tr>
+   <td>0x2A
+   </td>
+   <td>FDC PARAM register
+   </td>
+  </tr>
+  <tr>
+   <td>0x38
+   </td>
+   <td>Bank Select (0x3n, where n is bank 0-9)
+<p>
+Common area 0x0000-0x3FFF
+   </td>
+  </tr>
+  <tr>
+   <td>0x3C
+   </td>
+   <td>DIP Switch E
+   </td>
+  </tr>
+  <tr>
+   <td>0x3E
+   </td>
+   <td>FDC FIFO Control?
+   </td>
+  </tr>
+  <tr>
+   <td>0x3F
+   </td>
+   <td>ROM Enable (Read) / Disable (Write)
+   </td>
+  </tr>
+  <tr>
+   <td>0x40-0x47
+   </td>
+   <td>Hard Disk Controller
+   </td>
+  </tr>
+  <tr>
+   <td>0x60-0x62
+   </td>
+   <td>Cartridge Tape
+   </td>
+  </tr>
+  <tr>
+   <td>0x64-0x66
+   </td>
+   <td>Reel Tape
+   </td>
+  </tr>
+  <tr>
+   <td>0x70-0x7F
+   </td>
+   <td>MM58174 Real Time Clock
+   </td>
+  </tr>
+  <tr>
+   <td>0x80-0x83
+   </td>
+   <td>SYSTEM.DEV31
+   </td>
+  </tr>
+  <tr>
+   <td>0xEC-0xEE
+   </td>
+   <td>Centronics Port
+   </td>
+  </tr>
+</table>
+
+
+
+<table>
+  <tr>
+   <td colspan="8" ><strong><em>0x2A - Floppy Disk Controller PARAM</em></strong>
+   </td>
+  </tr>
+  <tr>
+   <td>7
+   </td>
+   <td>6
+   </td>
+   <td>5
+   </td>
+   <td>4
+   </td>
+   <td>3
+   </td>
+   <td>2
+   </td>
+   <td>1
+   </td>
+   <td>0
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>FDC Motor Enable?
+   </td>
+   <td>
+   </td>
+   <td>ROM enable?
+   </td>
+   <td>Double Density
+   </td>
+   <td>
+   </td>
+   <td colspan="2" >Floppy Drive Select
+   </td>
+  </tr>
+</table>
+
+
+
+## DIP Switch
+
+
+<table>
+  <tr>
+   <td colspan="6" ><strong><em>0x38 - DIP Switch at Location E</em></strong>
+   </td>
+  </tr>
+  <tr>
+   <td><strong>Switch</strong>
+<p>
+<strong>Position</strong>
+   </td>
+   <td><strong>Port 38H Bit</strong>
+   </td>
+   <td><strong>As Received</strong>
+   </td>
+   <td><strong>OFF Function</strong>
+   </td>
+   <td><strong>ON Function</strong>
+   </td>
+   <td><strong>Notes</strong>
+   </td>
+  </tr>
+  <tr>
+   <td>1
+   </td>
+   <td>0
+   </td>
+   <td>OFF
+   </td>
+   <td>Auto Boot
+   </td>
+   <td>Enter ROM monitor
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>2
+   </td>
+   <td>1
+   </td>
+   <td>ON
+   </td>
+   <td>Floppy Boot
+   </td>
+   <td>Hard Disk Boot
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>3
+   </td>
+   <td>2
+   </td>
+   <td>OFF
+   </td>
+   <td>Normal operation
+   </td>
+   <td>RAM test
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>4
+   </td>
+   <td>3
+   </td>
+   <td>OFF
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>5
+   </td>
+   <td>4
+   </td>
+   <td>OFF
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>6
+   </td>
+   <td>5
+   </td>
+   <td>OFF
+   </td>
+   <td>Boot HD 0
+   </td>
+   <td>Boot HD 3?
+   </td>
+   <td>Need to test (SA5)
+   </td>
+  </tr>
+  <tr>
+   <td>7
+   </td>
+   <td>6
+   </td>
+   <td>OFF
+   </td>
+   <td>8” Floppy (77 tracks)
+<p>
+Use Interrupts for FDC
+   </td>
+   <td>5.25” Floppy (80 tracks)
+<p>
+Use Polling for FDC
+   </td>
+   <td>OFF Enables SD and GO commands.
+   </td>
+  </tr>
+  <tr>
+   <td>8
+   </td>
+   <td>7
+   </td>
+   <td>OFF
+   </td>
+   <td>Don’t write 1 to I/O port 20H
+   </td>
+   <td>Write 1 to I/O port 20H
+   </td>
+   <td>? Causes an NMI when ON
+   </td>
+  </tr>
+</table>
+
+
+
+<table>
+  <tr>
+   <td colspan="8" ><strong><em>0x3E - Floppy Disk FIFO Control</em></strong>
+   </td>
+  </tr>
+  <tr>
+   <td>7
+   </td>
+   <td>6
+   </td>
+   <td>5
+   </td>
+   <td>4
+   </td>
+   <td>3
+   </td>
+   <td>2
+   </td>
+   <td>1
+   </td>
+   <td>0
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>
+   </td>
+   <td>FDCRD/WR#
+   </td>
+   <td>FIFO Reset
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+   <td>
+   </td>
+  </tr>
+</table>
+
+
+The floppy interface seems to include a FIFO which is filled by the FDC’s DRQ signal.
+
+
 # Running in the SIMH Simulator
 
 Compile SIMH using the patches in the digitex branch here:
@@ -361,4 +1054,3 @@ Run the AltairZ80 simulator using the ibc_multistar configuration file from this
 
 
 Press ESC to get to the monitor prompt.  There will be a lot of debug messages scrolling because there is a lot of verbose debugging enabled.
-
