@@ -667,13 +667,35 @@ l048c:  LD      A,(2D20H)
 l049c:  EX      (SP),HL
         RET     
 
-L049E:  DB      00H, 00H, 021H, 07H, 021H, 07H, 04DH, 09H
-        DB      4DH, 09H, 051H, 09H, 0A9H, 08H, 0ECH, 08H
-        DB      5EH, 08H, 05EH, 08H, 0FFH, 18H, 000H, 06H
-        DB      52H, 09H, 07EH, 09H, 089H, 09H, 00AH, 09H
-        DB      72H, 0FH, 088H, 13H, 0F1H, 12H, 016H, 13H 
-        DB      04H, 18H, 031H, 18H, 0A3H, 10H, 0CFH, 10H
-        DB      7AH, 17H, 0F5H, 18H, 08EH, 09H, 077H, 09H
+; Controller Command Jump Table
+L049E:  DW      RESET           ; 00H - Reset Controller
+        DW      L0721           ; 01H - HD Read?
+        DW      L0721           ; 02H - HW Write?
+        DW      L094D           ; 03H
+        DW      L094D           ; 04H
+        DW      L0951           ; 05H - Simply returns.
+        DW      L08A9           ; 06H
+        DW      L08EC           ; 07H
+        DW      L085E           ; 08H - Format?
+        DW      L085E           ; 09H
+        DW      L18FF           ; 0AH
+        DW      L0600           ; 0BH - Access FIFO?
+        DW      HMCMD           ; 0CH - Home
+        DW      L097E           ; 0DH
+        DW      L0989           ; 0EH
+        DW      L090A           ; 0FH
+        DW      L0F72           ; 10H - Read Parameters?
+        DW      GLCMD           ; 11H - GLCMD
+        DW      L12F1           ; 12H
+        DW      L1316           ; 13H
+        DW      L1804           ; 14H
+        DW      L1831           ; 15H
+        DW      RWCMD           ; 16H - Rewind
+        DW      TMCMD           ; 17H = Mount
+        DW      L177A           ; 18H
+        DW      L18F5           ; 19H
+        DW      SVCMD           ; 1AH - SVCMD
+        DW      L0977           ; 1BH
 
 ; INIT data structures
 L04D6:  LD      A,10H
@@ -980,7 +1002,7 @@ l0719:  IN      A,(18H)
         XOR     A                       ; Drive is online.
 l0720:  RET     
 
-        CALL    L0604
+L0721:  CALL    L0604
         JP      C,L0773
         LD      A,(2D20H)
         CP      01H
@@ -1120,7 +1142,7 @@ l0844:  LD      A,(2D94H)
         JP      L0809
 l085d:  RET     
 
-        XOR     A
+L085E:  XOR     A
         LD      (L2DF6),A
         LD      (L2D18),A
         INC     A
@@ -1155,7 +1177,7 @@ l08a1:  PUSH    AF
         POP     AF
         RET     
 
-        PUSH    IY
+L08A9:  PUSH    IY
         CALL    L069B
         LD      A,(L2D21)
         RRCA    
@@ -1184,7 +1206,7 @@ l08a1:  PUSH    AF
         POP     IY
         RET     
 
-        PUSH    IY
+L08EC:  PUSH    IY
         CALL    L069B
         PUSH    IY
         POP     HL
@@ -1200,7 +1222,7 @@ l08a1:  PUSH    AF
 l0907:  POP     IY
         RET     
 
-        PUSH    IY
+L090A:  PUSH    IY
         CALL    L069B
         LD      A,(L2D01)
         CP      03H
@@ -1230,11 +1252,11 @@ l0947:  LD      A,05H
 l094a:  POP     IY
         RET     
 
-        LD      A,05H
+L094D:  LD      A,05H
         SCF     
         RET     
 
-        RET     
+L0951:  RET
 
 HMCMD:  XOR     A
         LD      (L2D25),A
@@ -2151,7 +2173,7 @@ l0f51:  LD      A,04H
         SCF     
 l0f54:  RET     
 
-        LD      DE,2007H
+L0F55:  LD      DE,2007H
         LD      (2D92H),DE
         LD      HL,2107H
         LD      B,(HL)
@@ -2167,7 +2189,9 @@ l0f54:  RET
         LD      HL,DATABUF
         LD      B,14H
         JP      DUMPHEX
-        PUSH    IY
+
+; Read Drive Parameters?
+L0F72:  PUSH    IY
         LD      HL,206CH
         LD      DE,DATABUF
         XOR     A
@@ -3210,7 +3234,8 @@ l176c:  LD      DE,051FH
         LD      BC,1D0FH
         INC     C
         LD      A,(DE)
-        XOR     A
+
+L177A:  XOR     A
         LD      (2D1AH),A
         LD      (2D1BH),A
         LD      (L2D25),A
@@ -3270,7 +3295,7 @@ l17fc:  PUSH    AF
         POP     AF
         RET     
 
-        CALL    L18AA
+L1804:  CALL    L18AA
         RET     C
 
         LD      HL,(2D1EH)
@@ -3296,7 +3321,7 @@ l1824:  PUSH    AF
         POP     AF
         RET     
 
-        CALL    L18AA
+L1831:  CALL    L18AA
         RET     C
 
         LD      HL,(2D32H)
@@ -3404,13 +3429,13 @@ l18ec:  PUSH    AF
         SCF     
         RET     
 
-        OUT     (00H),A
+L18F5:  OUT     (00H),A
         CALL    L120E
         LD      (DATABUF),A
         XOR     A
         RET     
 
-        DI      
+L18FF:  DI
         LD      A,10H
         OUT     (08H),A
         EI      
@@ -3815,7 +3840,7 @@ l1c18:  CALL    GETBYTE
 ; Pointer to command jump table.
 L1C31:  DW      L1C33
 
-; 1C33 to 1CB2 - Command Jump Table 'CC' <addr>
+; Diagnostic Monitor Command Jump Table:
 L1C33:  DB      'IN'
         DW      INCMD
         DB      'CI'
