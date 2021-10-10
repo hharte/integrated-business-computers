@@ -15,13 +15,26 @@ d cpu commonlow 1
 d cpu common 4000
 
 ; Configure 6850 UART for serial ports 1-10.
+set m2sio0 en
+set m2sio1 en
+set m2sio0 iobase=00
+set m2sio0 debug
+d m2vec0 4
+d m2inten0 1
+set m2sio1 iobase=02
+set m2sio1 baud=9600
+d m2vec1 5
+d m2inten1 1
+attach m2sio1 connect=ser2
+set m2sio1 dcd
+
+;attach m2sio1 -U :8800 
+;set m2sio1 dtr
+;
+
 set sio ansi
 set sio verbose
 set sio nosleep
-set sio port=00/0/01/00/02/F/00/F
-set sio port=01/0/00/00/00/F/00/T
-set sio port=02/1/01/00/02/F/00/F
-set sio port=03/1/00/00/00/F/00/T
 set sio port=04/2/01/00/02/F/00/F
 set sio port=05/2/00/00/00/F/00/T
 set sio port=06/3/01/00/02/F/00/F
@@ -40,8 +53,8 @@ set sio port=12/9/01/00/02/F/00/F
 set sio port=13/9/00/00/00/F/00/T
 
 ; Enable keyboard interrupt for console SIO.
-d irqhack 1
-set sio interrupt
+;d irqhack 1
+;set sio interrupt
 
 ; Enable WD1793-based IBC MCC Disk Controller
 set wd179x enable
@@ -56,19 +69,19 @@ set wd179x iobase=0x24
 deposit fdctype 1795
 
 ; Timer tick for the RTC, 1Hz.
-set ibctimer debug
+;set ibctimer debug
 set ibctimer timeron
 
 set ibchdc debug=ERROR		;CMD;READ;WRITE;FIFO;VERBOSE
 set ibchdc en
-set ibchdc0 geometry=C:512/H:4/S:32/N:256
-set ibchdc1 geometry=C:512/H:4/S:32/N:256
+set ibchdc0 geometry=C:615/H:4/S:32/N:256
+set ibchdc1 geometry=C:615/H:4/S:32/N:256
 attach ibchdc0 IBC20MB.dsk
+;set IBCHDC Debug=ERROR;CMD;READ;WRITE;TF;VERBOSE;FIFO
 
 ;break e108	; Break at HD boot entry.
-deposit dipswe 0xff
+deposit dipswe 0xfd
 
 echo Press ESC to get into the monitor.
 reset
-
 g 0
