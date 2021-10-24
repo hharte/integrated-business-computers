@@ -1,15 +1,21 @@
-
 # IBC/Integrated Business Computers - MultiStar
 
 
-# IBC MultiStar* SERIES   Loader PROM  V3.4
+## IBC MultiStar* SERIES   Loader PROM  V3.4
 
 To get into the Loader PROM monitor, set DIP Switch E position 1 to ON, and press ESC on any one of the 10 serial ports.  Signs on with:
 
 
+```
+IBC MultiStar* SERIES   Loader PROM  V3.4
+*
+```
+
 <table>
   <tr>
-   <td><strong><em>Command</em></strong>
+   <td>
+
+<strong><em>Command</em></strong>
    </td>
    <td><strong><em>Argument</em></strong>
    </td>
@@ -280,7 +286,7 @@ Writes 0 to 0E420h
 
 
 
-## Memory Test
+### Memory Test
 
 The loader PROM contains a RAM memory test, which is invoked in any of the following ways:
 
@@ -306,7 +312,7 @@ which bank to select (0-9 or A<all>)? A
 
 
 
-## Important memory locations:
+### Important memory locations:
 
 0xE100 - Floppy and hard disk bootstraps are copied from ROM to here.  The second stage loader read from disk will use jump table entry points here to do disk reads.
 
@@ -325,7 +331,7 @@ which bank to select (0-9 or A<all>)? A
 0x8000-0x9A00 - Memory buffer used for Disk I/O (26 sectors of 128 bytes each.)  This is enough for one track worth of data.
 
 
-# IBC DIAGNOSTICS - DISK SLAVE V4.0
+## IBC DIAGNOSTICS - DISK SLAVE V4.0
 
 
 <table>
@@ -681,7 +687,7 @@ SC 00
 
 
 
-# I/O Ports
+## I/O Ports
 
 
 <table>
@@ -708,11 +714,15 @@ Write = Countdown (written to 0xfe)
    </td>
   </tr>
   <tr>
+   <td>0x18
+   </td>
+   <td>Z8530 BISYNC
+   </td>
+  </tr>
+  <tr>
    <td>0x20
    </td>
-   <td>1 written at 0x9f (Causes NMI.) Other bits have no effect.  Maybe MMU?
-<p>
-DIP Switch position 8=ON writes 1 to this register.
+   <td>RAM Parity Enable (Bit 0) (MultiStar)
    </td>
   </tr>
   <tr>
@@ -772,6 +782,12 @@ Common area 0x0000-0x3FFF
    </td>
   </tr>
   <tr>
+   <td>0x48
+   </td>
+   <td>HDC FIFO - 74LS245 K15 on disk board.
+   </td>
+  </tr>
+  <tr>
    <td>0x60-0x62
    </td>
    <td>Cartridge Tape
@@ -787,18 +803,6 @@ Common area 0x0000-0x3FFF
    <td>0x70-0x7F
    </td>
    <td>MM58174 Real Time Clock
-   </td>
-  </tr>
-  <tr>
-   <td>0x80-0x83
-   </td>
-   <td>SYSTEM.DEV31
-   </td>
-  </tr>
-  <tr>
-   <td>0xEC-0xEE
-   </td>
-   <td>Centronics Port
    </td>
   </tr>
 </table>
@@ -848,7 +852,7 @@ Common area 0x0000-0x3FFF
 
 
 
-## DIP Switch
+### DIP Switch
 
 
 <table>
@@ -949,11 +953,11 @@ Common area 0x0000-0x3FFF
    </td>
    <td>OFF
    </td>
-   <td>Boot HD 0
+   <td>Hard Disk (Unit 0)
    </td>
-   <td>Boot HD 3?
+   <td>Cartridge Disk (Unit 3)
    </td>
-   <td>Need to test (SA5)
+   <td>Hard Disk Boot Selection
    </td>
   </tr>
   <tr>
@@ -981,11 +985,11 @@ Use Polling for FDC
    </td>
    <td>OFF
    </td>
-   <td>Don’t write 1 to I/O port 20H
+   <td>Disable RAM Parity Check
    </td>
-   <td>Write 1 to I/O port 20H
+   <td>Enable RAM Parity Check
    </td>
-   <td>? Causes an NMI when ON
+   <td>Note: Unpopulated 74S280 Parity Generator/Checker at location 31D needs to be populated.
    </td>
   </tr>
 </table>
@@ -1039,7 +1043,12 @@ Use Polling for FDC
 The floppy interface seems to include a FIFO which is filled by the FDC’s DRQ signal.
 
 
-# Running in the SIMH Simulator
+## Replacing the ST-506 Controller with an SSD
+
+The [z80_ssd project](https://github.com/hharte/z80_ssd) replaces the on-board ST-506 controller with a MicroSD card supporting an 80MB Drive 0, and a 10MB removable cartridge drive 3.
+
+
+## Running in the SIMH Simulator
 
 Compile SIMH using the patches in the digitex branch here:
 
@@ -1054,3 +1063,4 @@ Run the AltairZ80 simulator using the ibc_multistar configuration file from this
 
 
 Press ESC to get to the monitor prompt.  There will be a lot of debug messages scrolling because there is a lot of verbose debugging enabled.
+
