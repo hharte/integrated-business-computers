@@ -565,9 +565,10 @@ L038E:  DB      006H, 032H, 001H, 020H, 0FEH, 00H, 00H, 01H             ; 0 = 01
         DB      007H, 0F2H, 002H, 020H, 080H, 01H, 00H, 01H             ; 6 = 02F2H = 754
         DB      00BH, 0F2H, 002H, 020H, 080H, 01H, 00H, 01H             ; 7 = 02F2H = 754
 
-L03CE:  DB      002H, 064H, 002H, 020H, 090H, 01H, 00H, 01H             ; 8 = 0264H = 612
-        DB      002H, 032H, 001H, 020H, 032H, 01H, 00H, 01H             ; 9 = 0132H = 306
-        DB      002H, 064H, 002H, 020H, 000H, 00H, 00H, 01H             ; A = 0264H = 612
+; Removable Media Hard Drives (Disk cartridges, either 10MB or 5MB)
+L03CE:  DB      002H, 064H, 002H, 020H, 090H, 01H, 00H, 01H             ; 8 = 0264H = 612 - 10MB disk cartridge
+        DB      002H, 032H, 001H, 020H, 032H, 01H, 00H, 01H             ; 9 = 0132H = 306 - 5MB disk cartridge
+        DB      002H, 064H, 002H, 020H, 000H, 00H, 00H, 01H             ; A = 0264H = 612 - 10MB disk cartridge
         DB      007H, 032H, 001H, 020H, 032H, 01H, 00H, 01H             ; B = 0132H = 306
 
         DB      04EH, 000H, 0A1H, 0FEH

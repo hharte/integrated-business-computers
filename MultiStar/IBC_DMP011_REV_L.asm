@@ -11,13 +11,14 @@
 ;     WD1795 without external FIFO, polled (5.25".)
 ;     IBC Disk Slave (ST-506) Hard Disk Controller.
 ;
+;NUL     EQU     00H
 CR      EQU     0DH
 LF      EQU     0AH
+ESC     EQU     1BH
 
 SPT5    EQU     16                      ; 16 sectors per track for 5.25" drives.
 SPT8SD  EQU     13                      ; 13 sectors per track for 8" single-density drives.
 SPT8DD  EQU     26                      ; 26 sectors per track for 8" double-density drives.
-
 
 DISKBUF EQU     08000H                  ; Disk buffer
 DBSIZE  EQU     01A00H                  ; Disk buffer size: 26*256-byte sectors
@@ -79,7 +80,7 @@ DIPSW   EQU     03CH                    ; IBC MCC DIP Switch at location E.
 ; DIP Switch Bits:
 SW_ROMMON       EQU     00H             ; Enter ROM monitor if ON, auto boot if OFF.
 SW_HDBOOT       EQU     01H             ; Boot Hard Disk if ON, boot Floppy if OFF.
-SW_RAMTEST      EQU     02H             ; Run RAM test if ON.
+SW_MEMTEST      EQU     02H             ; Run RAM test if ON.
 SW_HDSEL        EQU     05H             ; OFF = Boot hard disk 0, ON = Boot Hard Disk 3?
 SW_FDCTYPE      EQU     06H             ; Floppy Disk Type: OFF = 8-inch, ON = 5.25-inch.
 SW_PORT20H      EQU     07H
@@ -112,7 +113,7 @@ ZEROLP: LD      (HL),A
         JR      NZ,ZEROLP               ; (-05h)
         DJNZ    ZEROLP                  ; (-07h)
 
-; Reset Serial Ports
+; Initialize Serial Ports
         LD      A, ACIA_MR              ; Master Reset ACIA
         LD      BC,0A00H                ; 10 MC6850 UARTs
 l0022:  OUT     (C),A                   ; Control register
@@ -184,7 +185,7 @@ l006c:  PUSH    DE
 ; Copy 'SYSTEM NUCLEUS ' to BFNAME
         LD      BC,0011H
         LD      DE,BFNAME
-        LD      HL,l014D
+        LD      HL,NUCSTR
         LDIR
 
 ; Initialize serial ports to 38400,8,n,1
@@ -196,8 +197,8 @@ INITLP: OUT     (C),A                   ; Write ACIA Control register
         DJNZ    INITLP
 
 l009f:  IN      A,(DIPSW)               ; Read DIP switch E.
-        BIT     SW_RAMTEST,A            ; Check switch 3=ON
-        JP      Z,RAMTEST               ; ... if so, run RAM test.
+        BIT     SW_MEMTEST,A            ; Check switch 3=ON
+        JP      Z,MTCMD                 ; ... if so, run RAM test.
         BIT     SW_PORT20H,A            ; SW E-8: OFF = , ON = ? Related to MMU?
         JR      NZ,L00AE
         LD      A,01H
@@ -225,14 +226,14 @@ l00c8:  LD      (SIOBASE),A
         JR      NC,L009F
         JR      L00C8
 l00d9:  LD      HL,SIGNON               ; ' MultiStar* SERIES   Loader PROM  V3.4'
-        CALL    L0ED1
-L00DF:  CALL    L0ECE
+        CALL    PRSTRN
+L00DF:  CALL    PRPRMPT
 l00e2:  CALL    GETCHAR
         JR      Z,L00E2
         LD      DE,L00DF
         PUSH    DE
         LD      H,A
-        CALL    L0E6F
+        CALL    WAITCHAR
         LD      L,A
         PUSH    HL
         LD      B,19H
@@ -250,7 +251,7 @@ l00ff:  LD      D,(HL)
         XOR     A
         SBC     HL,DE
         POP     HL
-        JR      NZ,L0111                ; (+06h)
+        JR      NZ,L0111
         POP     HL
         LD      E,(HL)
         INC     HL
@@ -261,14 +262,14 @@ l00ff:  LD      D,(HL)
 l0111:  EX      (SP),HL
         INC     HL
         INC     HL
-        DJNZ    L00FF                   ; (-17h)
+        DJNZ    L00FF
         POP     HL
         LD      HL,L08D2                ; ' - invalid'
         JP      MONIT
 
 SIGNON  DB      02Fh, CR, LF, 'IBC MultiStar* SERIES   Loader PROM  V3.4 ', CR, LF, LF
 SIGNON_LEN EQU  $ - SIGNON - 1
-l014D:  DB      'SYSTEM  NUCLEUS ', 0
+NUCSTR: DB      'SYSTEM  NUCLEUS ', 0
 
 BFCMD:  XOR     A                       ; L 015E
         OUT     (HDCCMD),A              ; Write HD
@@ -289,22 +290,22 @@ l0175:  LD      (LE53B),A
         LD      HL,DISKBUF
         CALL    DISKRD                  ; Read track from disk
 l0185:  JR      C,BFCMD                 ; Error, retry forever.
-        JP      L0322
+        JP      BOOTSTRAP
 
 ; Floppy Utilities for 8" controller, copied to e100.
 FDUTILS8:
-        XOR     A
+        XOR     A                       ; Reset
         RET
 l018c:  JR      L0197
 l018e:  DW      FDCISR - FDUTILS8       ; E104: Offset of FDC ISR from beginning of FDUTILS8.
 l0190:  JR      L01A7
-        JR      L019D
+        JR      FDREAD
         JP      L05C0
 l0197:  LD      A,01H
         LD      (LE41C),A
         RET
 
-l019d:  LD      D,8CH
+FDREAD:  LD      D,8CH
         BIT     0,B
         JR      Z,L01AF
         SET     1,D
@@ -368,7 +369,7 @@ l0206:  IN      A,(FDCSTAT)             ; FDC Status Register
         RRA
         JR      NC,L0229
         LD      A,0CH                   ; Restore
-        OUT     (FDCSTAT),A             ; FDC Command
+        OUT     (FDCCMD),A              ; FDC Command
 l021a:  JR      L021A
         BIT     7,A
         LD      A,52H
@@ -390,7 +391,7 @@ l0230:  DEC     A
         OUT     (FDCDATA),A
         LD      A,1CH                   ; Floppy Seek
         OUT     (FDCCMD),A
-l0245:  JR      L0245                   ; (-02h)
+l0245:  JR      L0245
         BIT     7,A
         LD      A,53H
 l024b:  JR      NZ,L02CB                ; (+7eh)
@@ -441,7 +442,7 @@ l0295:  INC     A
         OUT     (FDCCMD),A              ; Floppy Read / Write? Sector
 l029d:  JR      L029D                   ; (-02h)
         AND     0DCH
-        JR      NZ,L02C7                ; (+24h)
+        JR      NZ,L02C7
         BIT     5,D
         JR      NZ,L02B6                ; (+0fh)
         LD      A,(FDCPARAM)
@@ -455,9 +456,9 @@ l029d:  JR      L029D                   ; (-02h)
 l02b6:  INC     C
         IN      A,(DIPSW)               ; Read DIP switch E.
         BIT     SW_FDCTYPE,A
-        LD      A,19H
+        LD      A,25
         JR      NZ,L02C1                ; 8" Floppy
-        LD      A,0FH
+        LD      A,15
 l02c1:  CP      C
         JR      NC,L025D                ; (-67h)
         XOR     A
@@ -480,7 +481,7 @@ l02da:  LD      B,A
         SCF
         JR      NZ,L02EB                ; (+04h)
         LD      A,B
-        OUT     (01H),A
+        OUT     (SIO0D),A
         SCF
 l02eb:  RET
 
@@ -496,7 +497,7 @@ FDCISR: EX      (SP),HL
 FDUTILS8_END    EQU     $
 
 ; Hard Disk Boot
-BSCMD:  LD      A,02H                   ; l 02f7
+BSCMD:  LD      A,02H
         LD      (LE434),A
         LD      BC,HDUTILSEND - HDUTILS ; Length of HDC utilities to be copied.
         LD      DE,RAMUTL               ; Destination for HDC utilities at E100h.
@@ -509,13 +510,14 @@ BSCMD:  LD      A,02H                   ; l 02f7
         CALL    RAMUTL                  ; Call HDC bootstrap in RAM.
         JR      C,BSCMD                 ; This always succeeds...
         LD      B,00H                   ; Copied by bootstrap into e445.
-        LD      DE,0000                 ; Copied by bootstrap into e442-e443
+        LD      DE,0                    ; Copied by bootstrap into e442-e443
         LD      HL,DISKBUF              ; RAM destination to read boot track into.
         CALL    DISKRD                  ; Read HD Bootstrap from disk.
         JR      C,BSCMD                 ; If it fails, retry forever...
 
 ; This part of the bootstrap is common to both floppy and hard disks.
-l0322:  LD      BC,0100H                ; Copy one sector
+BOOTSTRAP:
+        LD      BC,0100H                ; Copy one sector
         LD      DE,BOOTSTP              ; ... to C000h
         LD      HL,DISKBUF              ; ... from 8000h
         LDIR                            ; Perform the copy.
@@ -536,11 +538,11 @@ l0322:  LD      BC,0100H                ; Copy one sector
 ; 0xe446    Sectors per track, written to port 0x442
 ; 0xe447    Written to port 0x43
 ; 0xe448    Remaining sectors to read
-HDUTILS: ; l033D
-        JR      L0354                   ; E100H
-        JR      L0352                   ; E102H
+HDUTILS:
+        JR      HDRST                   ; E100H
+        JR      HDHOME                  ; E102H HOME the disk
 l0341:  DW      FDCISRH                 ; E104H FDC ISR
-        JR      L0352                   ; E106H
+        JR      HDHOME                  ; E106H
         JR      HDREAD                  ; E108H HDC Read
         JP      L05C0                   ; E11AH
         NOP
@@ -555,10 +557,10 @@ FDCISRH:
         EI
         RET
 
-l0352:  XOR     A
+HDHOME: XOR     A
         RET
 
-l0354:  XOR     A
+HDRST:  XOR     A
         RET
 
 ; Hard Disk Read (L 0356 in ROM, 0E119H in RAM)
@@ -701,7 +703,7 @@ RDHDFIFO:                               ; L 040E
         LD      A,(LE446)               ; 0xA, number of sectors to read.
         LD      B,A                     ; Store in B,
 
-RDSECLOOP:                              ; l 0415  
+RDSECLOOP:                              ; l 0415
         PUSH    BC                      ; and push onto stack.
         LD      B,00H
         INIR                            ; Read 256 bytes from FIFO at port 48h.
@@ -931,7 +933,7 @@ l058f:  LD      B,A
         SCF
         JR      NZ,L05A0                ; (+04h)
         LD      A,B
-        OUT     (01H),A
+        OUT     (SIO0D),A
         SCF
 l05a0:  RET
 FDUTILS5_END    EQU     $
@@ -983,30 +985,31 @@ l05ce:  LD      D,A
         POP     BC
         RET
 
-INCMD:  CALL    L061F                   ; 0x05d5
+INCMD:  CALL    SPGETBYTE
         LD      C,A
         IN      A,(C)
-        CALL    L0626
+        CALL    PRSPHEXB
         RET
 
-CICMD:  CALL    L061F                   ; 0x05df
+CICMD:  CALL    SPGETBYTE
         LD      C,A
-l05e3:  IN      A,(C)
+CICMD1: IN      A,(C)
         CALL    GETCHAR
-        JR      L05E3                   ; (-07h)
-OUCMD:  CALL    L061F                   ; l05ea
+        JR      CICMD1
+
+OUCMD:  CALL    SPGETBYTE
         LD      C,A
-        CALL    L061F
+        CALL    SPGETBYTE
         OUT     (C),A
         RET
 
 COCMD:  CALL    OUCMD
         LD      B,A
-l05f8:  CALL    GETCHAR
+COCMD1: CALL    GETCHAR
         OUT     (C),B
-        JR      L05F8                   ; (-07h)
+        JR      COCMD1
 
-FBCMD:  CALL    L061F                   ; 05FFh
+FBCMD:  CALL    SPGETBYTE
         LD      HL,DISKBUF
         LD      (HL),A
         LD      DE,8001H
@@ -1014,31 +1017,32 @@ FBCMD:  CALL    L061F                   ; 05FFh
         LDIR
         RET
 
-FICMD:  LD      BC,DBSIZE               ; L 060F
+FICMD:  LD      BC,DBSIZE
         LD      HL,DISKBUF
         XOR     A
-l0616:  LD      (HL),A
+FICMD1: LD      (HL),A
         INC     A
         INC     HL
         DEC     C
-        JR      NZ,L0616                ; (-06h)
-        DJNZ    L0616                   ; (-08h)
+        JR      NZ,FICMD1
+        DJNZ    FICMD1
         RET
 
-l061f:  CALL    PRSPACE
+SPGETBYTE:
+        CALL    PRSPACE
         CALL    GETBYTE
         RET
 
-l0626:  CALL    PRSPACE
-        CALL    L0EE1
+PRSPHEXB:  CALL    PRSPACE
+        CALL    PRHEXB
         RET
 
 ; DD for 8" drives.
 DDCMD:  LD      A,SPT8DD                ; 26 sectors
-        JR      L0633                   ; (+02h)
+        JR      SDCMD1
 
 SDCMD:  LD      A,SPT8SD                ; 13 sectors
-l0633:  LD      (TOTSEC),A
+SDCMD1: LD      (TOTSEC),A
         RET
 
 T0CMD:  CALL    LE102
@@ -1048,23 +1052,23 @@ T0CMD:  CALL    LE102
 STCMD:  LD      A,(FDCSTATUS)
         LD      B,A
         LD      HL,L090D
-        CALL    L064C
+        CALL    STCMD1
         LD      A,(FDCPARAM)
         LD      B,A
         LD      HL,L0916
-l064c:  CALL    L0ED1
+STCMD1: CALL    PRSTRN
         LD      A,B
-        CALL    L0626
+        CALL    PRSPHEXB
         RET
 
-H1CMD:  LD      A,01H                   ; 0x0654
-        JR      L0659                   ; (+01h)
-H0CMD:  XOR     A                       ; 0x0658
-l0659:  LD      (FDHEAD),A              ; 0x0659
+H1CMD:  LD      A,01H
+        JR      H0CMD1
+H0CMD:  XOR     A
+H0CMD1: LD      (FDHEAD),A
         RET
 
 USCMD:  CALL    PRSPACE                 ; 0x065d - FD Unit Select
-        CALL    L0E6F
+        CALL    WAITCHAR
         SUB     30H
         LD      HL,L08D2                ; ' - invalid'
         JP      C,MONIT
@@ -1080,7 +1084,7 @@ RTCMD:  CALL    GETTRK
         RET
 
 CRCMD:  CALL    GETTRK
-l0684:  CALL    GETCHAR
+CRCMD1: CALL    GETCHAR
         PUSH    BC
         PUSH    DE
         PUSH    HL
@@ -1088,14 +1092,14 @@ l0684:  CALL    GETCHAR
         POP     HL
         POP     DE
         POP     BC
-        JR      L0684                   ; (-0eh)
+        JR      CRCMD1
 
 ; Read and validate floppy track from console.
 GETTRK: LD      B,02H
         LD      HL,LE402
         PUSH    HL
         POP     DE
-        CALL    L0E2C
+        CALL    READCH
         CALL    L05A1
         LD      A,L                     ; Track < 0
         CP      00H
@@ -1118,7 +1122,7 @@ l06ba:  LD      A,(FDHEAD)
 ; RR command for 8" Floppy Drives
 RRCMD:  LD      IY,TRKTBL8
         LD      B,4DH
-l06c8:  PUSH    BC
+RRCMD1: PUSH    BC
         LD      A,(FDHEAD)
         LD      B,A
         LD      E,(IY+00H)
@@ -1127,15 +1131,15 @@ l06c8:  PUSH    BC
         LD      H,00H
         LD      L,E
         CALL    PUTC
-        CALL    L0EDC
+        CALL    PRHEXW
         LD      HL,DISKBUF
         CALL    DISKRD
-        JR      NC,L06E8                ; (+03h)
-        CALL    L0ECE
-l06e8:  CALL    GETCHAR
+        JR      NC,RRCMD2
+        CALL    PRPRMPT
+RRCMD2: CALL    GETCHAR
         POP     BC
-        DJNZ    L06C8                   ; (-26h)
-        JR      RRCMD                   ; (-2eh)
+        DJNZ    RRCMD1
+        JR      RRCMD
         RET
 
 WRCMD:  CALL    GETTRK
@@ -1145,7 +1149,7 @@ WRCMD:  CALL    GETTRK
         RET
 
 CWCMD:  CALL    GETTRK
-l0701:  CALL    GETCHAR
+CWCMD1: CALL    GETCHAR
         PUSH    BC
         PUSH    DE
         PUSH    HL
@@ -1153,64 +1157,64 @@ l0701:  CALL    GETCHAR
         POP     HL
         POP     DE
         POP     BC
-        JR      L0701                   ; (-0eh)
+        JR      CWCMD1
 
 DMCMD:  CALL    GETWORD
         LD      B,10H
-l0714:  PUSH    BC
+DMCMD1: PUSH    BC
         PUSH    HL
-        CALL    L0ECE
+        CALL    PRPRMPT
         POP     HL
-        CALL    L0EDC
+        CALL    PRHEXW
         CALL    DBLSPC
         LD      B,10H
         PUSH    HL
-l0723:  LD      A,(HL)
-        CALL    L0EE1
+DMCMD2: LD      A,(HL)
+        CALL    PRHEXB
         INC     HL
-        DJNZ    L0723                   ; (-07h)
+        DJNZ    DMCMD2
         CALL    DBLSPC
         POP     HL
         LD      B,10H
-l0730:  LD      A,(HL)
-        CALL    L0EF4
+DMCMD3: LD      A,(HL)
+        CALL    PRASC
         INC     HL
-        DJNZ    L0730                   ; (-07h)
+        DJNZ    DMCMD3
         POP     BC
-        DJNZ    L0714                   ; (-26h)
+        DJNZ    DMCMD1
         RET
 
-SMCMD:  CALL    PRSPACE                 ; L 073B
+SMCMD:  CALL    PRSPACE
         CALL    GETWORD
-l0741:  LD      A,(HL)
-        CALL    L0626
+SMCMD1: LD      A,(HL)
+        CALL    PRSPHEXB
         CALL    PRSPACE
-        CALL    L0E6F
+        CALL    WAITCHAR
         CP      20H
-        JR      Z,L075D                 ; (+0eh)
+        JR      Z,SMCMD3                 ; (+0eh)
         LD      B,00H
         PUSH    HL
-        LD      HL,L0759
+        LD      HL,SMCMD2
         EX      (SP),HL
-        CALL    L0E5C
-L0759:  CALL    L0E51
+        CALL    ATOX
+SMCMD2:  CALL    L0E51
         LD      (HL),A
-l075d:  INC     HL
+SMCMD3: INC     HL
         PUSH    HL
-        CALL    L0ECE
+        CALL    PRPRMPT
         POP     HL
-        CALL    L0EDC
-        JR      L0741                   ; (-27h)
+        CALL    PRHEXW
+        JR      SMCMD1                   ; (-27h)
 
-; Loop through all SIO ports 
-SICMD:  LD      C,01H                   ; l0768
-l076a:  IN      A,(C)
+; Loop through all SIO ports
+SICMD:  LD      C,SIO0D
+SICMD1: IN      A,(C)
         OUT     (C),A
         INC     C
         INC     C
         LD      A,C
         CP      15H
-        JR      C,L076A                 ; (-0bh)
+        JR      C,SICMD1
         CALL    GETCHAR                 ; Process character
         JR      SICMD                   ; (-12h)
 
@@ -1246,10 +1250,10 @@ l07aa:  CALL    RDHDCSTAT
 
 l07b6:  BIT     0,C
         JR      NZ,L07C9                ; (+0fh)
-        IN      A,(00H)
+        IN      A,(SIO0S)
         AND     01H
         JR      Z,L07C9                 ; (+09h)
-        IN      A,(01H)
+        IN      A,(SIO0D)
         OUT     (41H),A
         SET     0,C
         LD      A,C
@@ -1276,11 +1280,11 @@ l07da:  CALL    RDHDCSTAT
         RES     2,C
         LD      A,C
         OUT     (HDCCMD),A
-l07f2:  IN      A,(00H)
+l07f2:  IN      A,(SIO0S)
         AND     02H
         JR      Z,L07F2                 ; (-06h)
         LD      A,B
-        OUT     (01H),A
+        OUT     (SIO0D),A
 l07fb:  CALL    RDHDCSTAT
         BIT     5,A
         JR      Z,L07B6                 ; (-4ch)
@@ -1397,9 +1401,9 @@ STCMD5:  IN      A,(FDCSTAT)            ; ST for 5.25" drives.
         LD      A,(FDCPARAM)
         LD      B,A
         LD      HL,L0A5C
-l0935:  CALL    L0ED1
+l0935:  CALL    PRSTRN
         LD      A,B
-        CALL    L0626
+        CALL    PRSPHEXB
         RET
 
 RRCMD5:  LD      IY,TRKTBL5              ; RR for 5.25" drives.
@@ -1413,11 +1417,11 @@ l0943:  PUSH    BC
         LD      H,00H
         LD      L,E
         CALL    PUTC
-        CALL    L0EDC
+        CALL    PRHEXW
         LD      HL,DISKBUF
         CALL    DISKRD
         JR      NC,L0963                ; (+03h)
-l0960:  CALL    L0ECE
+l0960:  CALL    PRPRMPT
 l0963:  CALL    GETCHAR
         POP     BC
         DJNZ    L0943                   ; (-26h)
@@ -1484,7 +1488,7 @@ CMDTBL5:
 
 L0A1A:  DB      INVSTRLEN
         DB      ' - invalid'
-INVSTRLEN EQU   $ - L0A1A - 1        
+INVSTRLEN EQU   $ - L0A1A - 1
 L0A25:  DB      DESTRLEN
         DB      ' - disk err'
 DESTRLEN EQU    $ - L0A25 - 1
@@ -1501,19 +1505,19 @@ L0A5C:  DB      PARSTRLEN
         DB      ' PARAM -'
 PARSTRLEN EQU $ - L0A5C - 1
 
-; Entry if DIP SW E bit 2 is set:
-RAMTEST:
+; Memory Test: Entry if DIP SW E bit 2 is set:
+MTCMD:
         LD      A,03H                   ; Reset UART 1
-        OUT     (00H),A
+        OUT     (SIO0S),A
         LD      A,11H                   ; Set baud rate to 38400,n,8,1
-        OUT     (00H),A
+        OUT     (SIO0S),A
 
         LD      IY,L0A74
         JP      OUTCRLF
 l0a74:  LD      IY,L0A7E
         LD      DE,L0BF8                ; 'IBC MIDDI-CADET Memory Test'
         JP      OUTSTRQ
-L0A7E:  IN      A,(01H)
+L0A7E:  IN      A,(SIO0D)
         AND     7FH
         CP      41H
         JR      Z,L0A8E                 ; (+08h)
@@ -1527,7 +1531,7 @@ l0a8e:  EXX
 l0a91:  LD      IY,L0A9B
         LD      DE,L0C73                ; 'which bank to select (0-9 or A<all>)? '
         JP      OUTSTRQ
-L0A9B:  IN      A,(01H)
+L0A9B:  IN      A,(SIO0D)
         AND     7FH
         CP      41H
         JR      Z,L0AAB                 ; (+08h)
@@ -1683,7 +1687,7 @@ L0BB3:  LD      A,(DE)
         JR      NZ,OUTCHR               ; String is not empty, print it.
 WAITCH: IN      A,(SIO0S)
         AND     01H
-        JR      Z, WAITCH               ; Wait for character available.
+        JR      Z,WAITCH                ; Wait for character available.
         IN      A,(SIO0D)               ; Read character from SIO
         OUT     (SIO0D),A               ; ... and echo it.
         JP      OUTCRLF
@@ -1855,31 +1859,36 @@ l0e1c:  AND     0FH
         JP      OUTCHR
 
 L0E2B:  JP      (HL)
-l0e2c:  CALL    PRSPACE
-l0e2f:  CALL    L0E6F
+
+; Read B characters into memory at HL.
+READCH: CALL    PRSPACE
+READCH1:
+		CALL    WAITCHAR
         CP      0DH
-        JR      Z,L0E42                 ; (+0ch)
+        JR      Z,ISCR
         CP      08H
-        JR      NZ,L0E3E                ; (+04h)
+        JR      NZ,NOTBS
         INC     B
         DEC     HL
-        JR      L0E2F                   ; (-0fh)
-l0e3e:  LD      (HL),A
+        JR      READCH1
+NOTBS:  LD      (HL),A
         INC     HL
-        DJNZ    L0E2F                   ; (-13h)
-l0e42:  XOR     A
+        DJNZ    READCH1
+ISCR:   XOR     A
         LD      (HL),A
         RET
 
 ; Read Hex 16 bits from Console into HL
-GETWORD: CALL   GETBYTE
+GETWORD:
+        CALL    GETBYTE
         LD      H,A
         CALL    GETBYTE
         LD      L,A
         RET
 
 ; Read Hex Byte from Console into A
-GETBYTE: CALL    L0E55                   ; l 0e4e
+GETBYTE:
+        CALL    L0E55                   ; l 0e4e
 l0e51:  RLA
         RLA
         RLA
@@ -1887,26 +1896,28 @@ l0e51:  RLA
 l0e55:  PUSH    BC
         AND     0F0H
         LD      B,A
-        CALL    L0E6F
-l0e5c:  SUB     30H
-        JR      C,L0EA2                 ; (+42h)
+        CALL    WAITCHAR
+ATOX:   SUB     '0'                     ; Convert ASCII to Hex
+        JR      C,PRINVAL
         CP      0AH
-        JR      C,L0E6C                 ; (+08h)
+        JR      C,ATOX1
         SUB     07H
-        JR      C,L0EA2                 ; (+3ah)
+        JR      C,PRINVAL
         CP      10H
-        JR      NC,L0EA2                ; (+36h)
-l0e6c:  OR      B
+        JR      NC,PRINVAL
+ATOX1:  OR      B
         POP     BC
         RET
 
-l0e6f:  CALL    CONSTAT
-        JR      Z,L0E6F                 ; (-05h)
+WAITCHAR:
+        CALL    CONSTAT
+        JR      Z,WAITCHAR                 ; (-05h)
         CALL    GETCHAR
         RET
 
 ; Check if character is available from the console.
-CONSTAT:  LD    A,(SIOBASE)
+CONSTAT:
+        LD      A,(SIOBASE)
         PUSH    BC
         LD      C,A
         IN      A,(C)
@@ -1915,7 +1926,8 @@ CONSTAT:  LD    A,(SIOBASE)
         RET
 
 ; GETCHAR - Read character from Console, return to Monitor if ESC.
-GETCHAR:  PUSH    BC
+GETCHAR:
+        PUSH    BC
         CALL    CONSTAT
         JR      Z,L0EA0                 ; (+17h)
         LD      A,(SIOBASE)             ; Base of SIO (Status)
@@ -1924,16 +1936,18 @@ GETCHAR:  PUSH    BC
         IN      A,(C)                   ; Read from SIO Data Port
         AND     7FH                     ; 7-bit ASCII
         CP      'a'                     ; Check if lower case.
-        JR      C,L0E98                 ; Already upper case.
+        JR      C,GETCHAR1                 ; Already upper case.
         RES     5,A                     ; Convert to upper case.
-l0e98:  CP      1BH                     ; If ESC,
+GETCHAR1:
+        CP      ESC                     ; If ESC,
         JP      Z,REINIT                ; ... return to monitor.
         CALL    PUTC                    ; Echo the character to the console
 l0ea0:  POP     BC
         RET
 
-l0ea2:  LD      HL,L08D2                ; ' - invalid'
-MONIT:  CALL    L0ED1                   ; 0xl0ea5
+PRINVAL:
+        LD      HL,L08D2                ; ' - invalid'
+MONIT:  CALL    PRSTRN
 REINIT: LD      SP,STKTOP
         JP      L00D9                   ; Signon and command prompt.
 
@@ -1942,51 +1956,54 @@ REINIT: LD      SP,STKTOP
 ; are utilized.  Instead, registers are used to hold all state.
 ;
 ; Memory Parity Error, do RAM test...
-PARERR: LD      DE,PERRSTR                ; l0f1b:  DS      'Memory Parity Error!!! (ESC or M)', 07H, 0
-        LD      IY,L0EB8
+PARERR: LD      DE,PERRSTR              ; 'Memory Parity Error!!! (ESC or M)', 07H, 0
+        LD      IY,PERR1
         JP      OUTSTR
 
-l0eb8:  IN      A,(00H)
+PERR1:  IN      A,(SIO0S)
         AND     01H
-        JR      Z,L0EB8                 ; (-06h)
-        IN      A,(01H)
+        JR      Z,PERR1
+        IN      A,(SIO0D)
         AND     5FH
-        CP      1BH                      ; ESC, reset to 0.
+        CP      ESC                     ; ESC, reset to 0.
         JP      Z,START
         CP      'M'                     ; 'M'
-        JP      Z,RAMTEST
+        JP      Z,MTCMD
         JR      PARERR
-l0ece:  LD      HL,PROMPT               ; 0x0F3e
-l0ed1:  PUSH    BC                      ; Print string, count is in first byte,
+PRPRMPT:
+        LD      HL,PROMPT
+PRSTRN: PUSH    BC                      ; Print counted string, count is in first byte.
         LD      B,(HL)
-l0ed3:  INC     HL
+PRSTLP: INC     HL
         LD      A,(HL)
         CALL    PUTC
-        DJNZ    L0ED3                   ; (-07h)
+        DJNZ    PRSTLP
         POP     BC
         RET
 
-l0edc:  LD      A,H
-        CALL    L0EE1
+PRHEXW: LD      A,H
+        CALL    PRHEXB
         LD      A,L
-l0ee1:  PUSH    AF
+PRHEXB: PUSH    AF
         RRA
         RRA
         RRA
         RRA
-        CALL    L0EEA
-        POP     AF
-l0eea:  AND     0FH
-        ADD     A,30H
-        CP      3AH
-        JR      C,L0EF4                 ; (+02h)
+        CALL    PRHNIB                  ; Print upper nibble
+        POP     AF                      ; Get lower nibble
+PRHNIB: AND     0FH                     ; Convert nibble to Hex and print.
+        ADD     A,'0'
+        CP      ':'
+        JR      C,PRASC
         ADD     A,07H
-l0ef4:  CP      20H
-        JR      C,L0EFC                 ; (+04h)
+
+; Print ASCII character in A.  If non printable, replace with a period.
+PRASC:  CP      ' '
+        JR      C,PRASC1
         CP      80H
         JR      C,PUTC
-l0efc:  LD      A,2EH
-PUTC:   PUSH    BC                      ; 0x0efe
+PRASC1: LD      A,'.'
+PUTC:   PUSH    BC
         LD      B,A
         LD      A,(SIOBASE)             ; 0xe41a contains I/O port for console.
         LD      C,A
@@ -1999,9 +2016,9 @@ SIORDY: IN      A,(C)                   ; SIO Status port
         POP     BC
         RET
 
-DBLSPC: CALL    PRSPACE                 ; 0x0F10: Print two spaces
+DBLSPC: CALL    PRSPACE                 ; Print two spaces
 PRSPACE:
-        PUSH    AF                      ; 0x0F13: Print space
+        PUSH    AF                      ; Print space
         LD      A,20H
         CALL    PUTC
         POP     AF
