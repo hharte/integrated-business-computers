@@ -25,7 +25,7 @@ set m2sio1 iobase=02
 set m2sio1 baud=9600
 d m2vec1 5
 d m2inten1 1
-attach m2sio1 connect=ser2
+attach m2sio1 connect=com11
 set m2sio1 dcd
 
 ;attach m2sio1 -U :8800 
@@ -52,21 +52,17 @@ set sio port=11/8/00/00/00/F/00/T
 set sio port=12/9/01/00/02/F/00/F
 set sio port=13/9/00/00/00/F/00/T
 
-; Enable keyboard interrupt for console SIO.
-;d irqhack 1
-;set sio interrupt
-
-; Enable WD1793-based IBC MCC Disk Controller
-set wd179x enable
 set ibc_mcc debug=ERROR;VERBOSE
 set ibc_mcc enable
 
-; Attach to OASIS 5.6 Boot Disk
-attach ibc_mcc0 IBC_MIDDI_CADET_OASIS56.imd
-
-;set wd179x debug=ERROR;SEEK;READ;WRITE;IMD
+; Enable WD1793-based IBC MCC Disk Controller
+set wd179x enable
+set wd179x debug=ERROR
 set wd179x iobase=0x24
 deposit fdctype 1795
+
+; Attach to OASIS 5.6 Boot Disk
+attach ibc_mcc0 IBC_MIDDI_CADET_OASIS56.imd
 
 ; Timer tick for the RTC, 1Hz.
 ;set ibctimer debug
@@ -74,13 +70,20 @@ set ibctimer timeron
 
 set ibchdc debug=ERROR		;CMD;READ;WRITE;FIFO;VERBOSE
 set ibchdc en
-set ibchdc0 geometry=C:615/H:4/S:32/N:256
-set ibchdc1 geometry=C:615/H:4/S:32/N:256
-attach ibchdc0 IBC20MB.dsk
-;set IBCHDC Debug=ERROR;CMD;READ;WRITE;TF;VERBOSE;FIFO
+set ibchdc0 geometry=C:680/H:15/S:32/N:256
+set ibchdc3 geometry=C:612/H:2/S:32/N:256
 
-;break e108	; Break at HD boot entry.
+attach ibchdc0 IBCDISK0.dsk
+attach ibchdc3 IBCDISK3.dsk
+
+; Enter ROM monitor (diagnostics)
+;deposit dipswe 0xfe
+; Hard disk auto-boot
 deposit dipswe 0xfd
+; Floppy disk auto-boot
+;deposit dipswe 0xff
+; Cartridge disk auto-boot
+;deposit dipswe 0xdd
 
 echo Press ESC to get into the monitor.
 reset

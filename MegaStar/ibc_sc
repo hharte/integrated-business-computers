@@ -25,10 +25,11 @@ set m2sio1 iobase=02
 set m2sio1 baud=9600
 d m2vec1 7
 d m2inten1 1
-;attach m2sio1 connect=ser2
+attach m2sio1 connect=com11
 set m2sio1 dcd
-set m2sio1 dtr
-attach m2sio1 -U :8800 
+
+;attach m2sio1 -U :8800
+;set m2sio1 dtr
 ;
 
 set sio ansi
@@ -65,24 +66,23 @@ set sio port=35/9/00/00/00/F/00/T
 set sio port=36/9/01/00/02/F/00/F
 set sio port=37/9/00/00/00/F/00/T
 
-; Enable keyboard interrupt for console SIO.
-;d irqhack 1
-;set sio interrupt
+set ibc_mcc Debug=ERROR;VERBOSE;PIO;RTC;SBD;CACHE		; BANK;DRIVE;UART
+set ibc_mcc enable
+set cpu history=1000
 
 ; Enable WD1793-based IBC MCC Disk Controller
 set wd179x enable
-set ibc_mcc Debug=ERROR;VERBOSE;PIO;RTC;SBD;CACHE		; BANK;DRIVE;UART
-set ibc_mcc enable
-
-; Attach to OASIS 5.6 Boot Disk
-;attach ibc_mcc0 OASIS_M5_6A_MU_OS_IBC_CADET_WITH_SORT_CONTROL_FORMS_SER_16-2780.imd
-attach ibc_mcc0 OASIS_MU_OS_M5_6A_IBC_CADET_CACHE.imd
-
-set wd179x debug=ERROR	;READ;WRITE ;IMD
+set wd179x debug=ERROR
 set wd179x iobase=0x24
 deposit fdctype 1795
-d wd179x intenable 1
-d wd179x intvector 4
+;d wd179x intenable 1
+;d wd179x intvector 4
+
+; Attach to OASIS 5.6 Boot Disk
+attach ibc_mcc0 OASIS56_SC.imd
+;attach ibc_mcc0 OASIS_M5_6A_MU_OS_IBC_CADET_WITH_SORT_CONTROL_FORMS_SER_16-2780.imd
+;attach ibc_mcc0 OASIS_MU_OS_M5_6A_IBC_CADET_CACHE.imd
+attach ibc_mcc1 SDS_SBC-200_GOPH000A_V5_6_Version-03-04-83.imd
 
 ; IBC Timer
 set ibctimer debug
@@ -90,13 +90,18 @@ set ibctimer timeron
 
 set ibcsmd debug=ERROR
 set ibcsmd en
-set ibcsmd0 geometry=C:228/H:7/S:41/N:256
-set ibcsmd1 geometry=C:512/H:6/S:32/N:256
-attach ibcsmd0 IBCSC20MB.dsk
+set ibcsmd0 geometry=C:823/H:3/S:64/N:256
+set ibcsmd1 geometry=C:823/H:3/S:64/N:256
+attach ibcsmd0 IBCSC48MB_0.dsk
+attach ibcsmd1 IBCSC48MB_1.dsk
 
-deposit dipswe 0xfe
+; Enter ROM monitor (diagnostics)
+;deposit dipswe 0xf1
+; Hard disk auto-boot
+deposit dipswe 0xf2
+; Floppy disk auto-boot
+;deposit dipswe 0xf0
 
 echo Press ESC to get into the monitor.
 reset
-;break -m 1516
-;g 0
+g 0
