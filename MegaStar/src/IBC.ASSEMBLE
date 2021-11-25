@@ -1,0 +1,77 @@
+    TITLE   'IBC Super Cadet Routines'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+        SUBT    'Clock Routines'
+N$CLOCK:    REL
+;
+        ENTRY   STARTRTC
+        ENTRY   STOPRTC
+        ENTRY   IBCSECOND
+        ENTRY   IBCTICK
+;
+        EXTRN   SECOND
+        EXTRN   TICK
+        EXTRN   RETI
+;
+;
+; 1 second tick routine
+;
+IBCSECOND:  ;L3307
+        CALL    SECOND          ; one second has elapsed
+        EI                      ; allow interrupts again
+        RETI                    ; return from interrupt
+;
+STARTRTC:
+        PUSH    AF
+        LD      A,87H
+        OUT     (34H),A
+        LD      A,0FAH
+        OUT     (34H),A
+        POP     AF
+        RET
+;
+STOPRTC:
+        PUSH    AF
+        LD      A,03H
+        OUT     (34H),A
+        POP     AF
+        RET
+;
+IBCTICK:
+        CALL    0048H ; RETI=47H
+        JP      TICK
+;
+        SUBT    'ESC I Routine'
+N$ESC:  REL
+        ENTRY   ESCI
+ESCI:
+        RET
+;
+        COPY    IBC
+        END

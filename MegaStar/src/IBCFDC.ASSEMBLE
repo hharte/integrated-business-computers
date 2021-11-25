@@ -1,0 +1,261 @@
+    TITLE   'Floppy Disk Driver for the IBC Super Cadet'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$DISKIO:   REL
+
+        ENTRY   FLPRD
+        ENTRY   FLPWR
+        ENTRY   FDCISR
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+FLPRD:  JP      FDREAD
+FLPWR:  JP      FDWRITE
+L0FE6:  LD      (IY+U_DRIVE),A
+l0fe9:  RET
+
+        RET
+
+FDREAD: LD      (IY+U_OPER),8CH         ; Read side 0
+l0fef:  BIT     0,B                     ; Check if operating on side 0 or 1
+        JR      Z,FDCOM                 ; Side 0
+        LD      (IY+U_OPER),8EH         ; Read side 1
+        JR      FDCOM                   ; Read/write common entry
+;
+; write entry
+;
+FDWRITE:
+        LD      (IY+U_OPER),0ACH        ; Write side 0
+        BIT     0,B                     ; Check if operating on side 0 or 1
+        JR      Z,FDCOM                 ; Side 0
+        LD      (IY+U_OPER),0AEH        ; Write side 1
+;
+; common routine
+;
+FDCOM:  LD      (IY+U_SCNT),A           ; Save sector count in UCB
+        LD      (FDHDSEC),BC            ; Save Head/Sector number
+        LD      (FDCYLN),DE             ; Save Cylinder
+        LD      (FDXADR),HL             ; Save transfer address
+        LD      A,(IY+U_DRIVE)          ; Get drive number from UCB
+        OR      38H
+l1018:  BIT     5,(IY+U_OPER)
+l101c:  JR      Z,L1020
+        RES     5,A
+l1020:  BIT     0,B
+        JR      Z,L1026
+        SET     2,A
+l1026:  LD      B,A
+        LD      A,(IY+U_NSECT)
+        CP      14
+l102c:  JR      C,L1032
+        XOR     A
+        CP      E
+        JR      NZ,L1038
+l1032:  LD      A,7FH
+l1034:  RES     3,B
+        JR      L103A
+l1038:  LD      A,0FFH
+l103a:  LD      (L11A4),A
+        LD      A,B
+        OUT     (2AH),A
+        LD      (L11A2),A
+        LD      A,C
+        BIT     3,B
+        JR      NZ,L1049
+        ADD     A,A
+l1049:  INC     A
+        LD      (IY+U_WORK5),A
+l104d:  IN      A,(FDCSTAT)
+        BIT     0,A
+        JR      NZ,L104D
+        BIT     7,A
+        LD      A,01H
+        JP      NZ,L115A
+        SRL     (IY+U_WORK3)
+        JR      NC,L1073
+        LD      A,0CH                   ; Restore
+        CALL    DOFDCCMD
+        BIT     7,A
+        LD      A,01H
+        JP      NZ,L115A
+        XOR     A
+        LD      (IY+U_WORK3),A
+        LD      (IY+U_CCYLL),A
+l1073:  LD      A,(IY+U_CCYLL)
+        OUT     (FDCTRK),A
+        CP      E
+        JR      Z,L10BB
+        LD      A,0AH
+l107d:  DEC     A
+        JR      NZ,L107D
+        IN      A,(FDCSTAT)
+        BIT     7,A
+        LD      A,01H
+        JP      NZ,L115A
+        LD      A,E
+        LD      (IY+U_CCYLL),A
+        OUT     (FDCDATA),A
+        LD      A,(IY+U_STDT)
+        LD      B,00H
+        CP      04H
+        JR      C,L10A3
+        INC     B
+        CP      07H
+        JR      C,L10A3
+        INC     B
+        CP      0BH
+        JR      C,L10A3
+        INC     B
+l10a3:  LD      A,1CH                   ; Floppy Seek
+        OR      B
+        CALL    DOFDCCMD
+        BIT     7,A
+        LD      A,01H
+        JP      NZ,L115A
+        BIT     2,(IY+U_OPER)
+        JR      NZ,L10BB
+        LD      A,(IY+U_SEDT)
+        SC      19                      ; Delay A ms.
+l10bb:  BIT     5,(IY+U_OPER)
+        JR      Z,L10D6
+        LD      A,(L11A2)
+        BIT     4,A
+        OUT     (2AH),A
+        OUT     (3EH),A
+        LD      HL,(FDXADR)
+        LD      BC,FDCFIFO              ; Write 256 bytes to the FIFO
+l10d0:  LD      A,(HL)
+        OUT     (C),A
+        INC     HL
+        DJNZ    L10D0
+l10d6:  LD      A,(L11A2)
+        OUT     (2AH),A
+        OUT     (3EH),A
+l10dd:  LD      A,(IY+U_WORK5)
+        OUT     (FDCSEC),A
+        LD      A,(IY+U_OPER)
+        RES     2,(IY+U_OPER)
+        CALL    DOFDCCMD
+        AND     0DCH
+        JP      NZ,L1139
+        INC     (IY+U_WORK5)
+        BIT     0,(IY+U_WORK5)
+        LD      A,(L11A4)
+        RLA
+        JR      C,L1101
+        JP      Z,L10DD
+l1101:  BIT     5,(IY+U_OPER)
+        JR      NZ,L111C
+        LD      A,(L11A2)
+        RES     4,A
+        OUT     (2AH),A
+        OUT     (3EH),A
+        LD      HL,(FDXADR)
+        LD      BC,FDCFIFO              ; Read 256 bytes from the FIFO.
+l1116:  IN      A,(FDCFIFO)
+        LD      (HL),A
+        INC     HL
+        DJNZ    L1116
+l111c:  LD      DE,(FDCYLN)
+        LD      BC,(FDHDSEC)
+        INC     C
+        LD      A,(IY+U_SCNT)
+        DEC     A
+        LD      (IY+U_SCNT),A
+        JR      Z,L1166
+        RET     Z
+
+        LD      (FDHDSEC),BC
+        LD      (FDXADR),HL
+        JP      L10BB
+l1139:  LD      C,01H
+        BIT     7,A
+        JR      NZ,L1157
+        INC     C
+        BIT     6,A
+        INC     C
+        INC     C
+        BIT     3,A
+        JR      Z,L1150
+        BIT     4,A
+        JR      Z,L1157
+        LD      C,09H
+        JR      L1157
+l1150:  INC     C
+        INC     C
+        INC     C
+        LD      (IY+U_WORK3),01H
+l1157:  LD      A,C
+        JR      L115E
+l115a:  LD      (IY+U_WORK3),01H
+l115e:  OR      A
+        LD      BC,(FDHDSEC)
+        LD      HL,(FDXADR)
+l1166:  LD      DE,(FDCYLN)
+        RET
+        RET
+
+DOFDCCMD:
+        LD      (UCB),IY
+        LD      (IY+U_FDDONE),00H
+        OUT     (FDCCMD),A
+l1176:  SC      79                      ; SNU
+        SLA     (IY+U_FDDONE)
+        JR      NC,L1176
+        LD      A,(CURFDSTAT)
+        RET
+
+; FDC Interrupt Handler
+FDCISR: PUSH    AF
+        PUSH    IY
+        LD      IY,(UCB)
+        LD      (IY+U_FDDONE),0FFH
+        IN      A,(FDCSTAT)
+        LD      (CURFDSTAT),A
+        POP     IY
+        POP     AF
+        EI
+        RETI
+
+        SUBT    'Data areas and equates'
+FDHDSEC:
+        DS      2
+FDCYLN: DS      2
+FDXADR: DS      2
+        DS      1
+UCB:    DW      0
+CURFDSTAT:
+        DC      01H                     ; Current FDC Status
+L11A2:  DC      26H, 00H
+L11A4:  DS      0
+        DC      0
+
+        COPY    IBC
+        COPY    UCBDEFS
+
+        END

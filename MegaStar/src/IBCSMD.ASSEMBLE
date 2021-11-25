@@ -1,0 +1,522 @@
+    TITLE   'IBC Super Cadet Dual SMD Hard Disk Driver'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$DISKIO:   REL
+
+        ENTRY   HDRD
+        ENTRY   HDWR
+        ENTRY   L1556
+;
+; SMD Hard Disk Driver
+HDRD:   JP      SMDRD
+HDWR:   JP      SMDWR
+        LD      D,(HL)
+        DEC     D
+        LD      (IY+U_DRIVE),A
+        RET
+
+        RET
+
+SMDRD:  LD      (IY+U_OPER),88H
+        JR      SMDCOM
+SMDWR:  LD      (IY+U_OPER),81H
+SMDCOM: PUSH    IX
+        PUSH    DE
+        PUSH    AF
+        LD      IX,L1556
+        LD      A,(IY+U_DRIVE)
+        ADD     A,A
+        ADD     A,A
+        ADD     A,A
+        LD      E,A
+        LD      D,00H
+        ADD     IX,DE
+        LD      A,(IX+07H)
+        LD      (L153A),A
+        POP     AF
+        POP     DE
+        LD      (IY+U_SCNT),A
+        LD      (L152F),BC
+        ADD     A,C
+        DEC     A
+        LD      B,A
+        LD      A,C
+        LD      (L1535),A
+        LD      A,B
+        LD      BC,(L153A)
+        CP      C
+        LD      A,05H
+        JR      NC,L120B
+        LD      (L1531),DE
+        LD      (L1533),HL
+        CALL    L120F
+        LD      HL,(L1533)
+        LD      DE,(L1531)
+        LD      BC,(L152F)
+        LD      A,(L1535)
+        LD      C,A
+        LD      A,(IY+U_SCNT)
+l120b:  POP     IX
+        OR      A
+        RET
+
+l120f:  LD      HL,(L1531)
+        LD      E,(IX+02H)
+        LD      D,(IX+01H)
+        ADD     HL,DE
+        LD      (L1538),HL
+        LD      A,05H
+        JR      C,L126E
+        LD      E,(IX+05H)
+        LD      D,(IX+04H)
+        SBC     HL,DE
+        JR      NC,L126E
+        LD      A,(IX+03H)
+        OR      A
+        JP      M,L126B
+        LD      BC,(L152F)
+        ADD     A,B
+        LD      (L1537),A
+        LD      A,05H
+        JR      C,L126E
+        LD      A,(L1537)
+        LD      C,(IX+06H)
+        CP      C
+        LD      A,05H
+        JR      NC,L126E
+        LD      A,(L1548)
+        LD      B,(IX+00H)
+        CP      B
+        JR      Z,L1259
+        LD      A,B
+        LD      (L1548),A
+        LD      (IY+U_FDDONE),0FFH
+l1259:  OR      A
+        JR      Z,L1262
+        LD      IX,L1549
+        JR      L1266
+l1262:  LD      IX,L153C
+l1266:  CALL    L1272
+        JR      L126E
+l126b:  LD      A,01H
+        SCF
+l126e:  LD      (IY+U_SCNT),A
+        RET
+
+l1272:  LD      A,(IY+U_FDDONE)
+        INC     A
+        JR      NZ,L1281
+        LD      (IY+U_FDDONE),A
+        CALL    L1342
+        JP      C,L1303
+l1281:  LD      A,(IY+U_WORK3)
+        INC     A
+        JR      NZ,L128C
+        CALL    L1372
+        JR      C,L1303
+l128c:  LD      DE,(L1538)
+        LD      A,(L1537)
+        LD      C,A
+        LD      L,(IX+00H)
+        LD      H,(IX+01H)
+        LD      B,(IX+02H)
+        LD      A,C
+        CP      B
+        JR      NZ,L12A6
+        XOR     A
+        SBC     HL,DE
+        JR      Z,L12BE
+l12a6:  LD      (IX+0AH),E
+        LD      (IX+0BH),D
+        LD      (IX+09H),C
+        LD      (IX+00H),E
+        LD      (IX+01H),D
+        LD      (IY+U_CCYLL),E
+        LD      (IY+U_CCYLH),D
+        LD      (IX+02H),C
+l12be:  LD      E,(IX+0AH)
+        LD      D,(IX+0BH)
+        LD      C,(IX+09H)
+        LD      L,(IX+03H)
+        LD      H,(IX+04H)
+        LD      (IX+07H),00H
+        LD      A,C
+        CP      (IX+05H)
+        JR      Z,L12E1
+        DEC     (IX+07H)
+        CALL    L1321
+        JR      C,L1303
+        JR      L12E6
+l12e1:  XOR     A
+        SBC     HL,DE
+        JR      Z,L12EE
+l12e6:  DEC     (IX+07H)
+        CALL    L1304
+        JR      C,L1303
+l12ee:  LD      A,(IX+07H)
+        OR      A
+        JR      Z,L1300
+        CALL    L13F3
+        JR      NC,L1300
+        CP      0AAH
+        JR      Z,L12BE
+        SCF
+        JR      L1303
+l1300:  CALL    L14A1
+l1303:  RET
+
+l1304:  XOR     A
+        OUT     (SMDCMD),A
+        LD      (IX+03H),E
+        LD      (IX+04H),D
+        LD      A,D
+        OUT     (SMDARG0),A
+        LD      A,E
+        OUT     (SMDARG1),A
+        LD      A,20H
+        OUT     (SMDCMD),A
+        CALL    L13AF
+        JR      NC,L1320
+        LD      (IY+U_WORK3),0FFH
+l1320:  RET
+
+l1321:  XOR     A
+        OUT     (SMDCMD),A
+        OUT     (SMDARG0),A
+        LD      A,C
+        LD      (IX+05H),A
+        OUT     (SMDARG1),A
+        LD      A,40H
+        OUT     (SMDCMD),A
+        CALL    L13DF
+        JR      NC,L1341
+        LD      (IX+02H),0FFH
+        LD      (IX+05H),0FFH
+        LD      (IY+U_WORK3),0FFH
+l1341:  RET
+
+l1342:  XOR     A
+        OUT     (SMDARG0),A
+        LD      A,10H
+        OUT     (SMDARG1),A
+        LD      A,80H
+        OUT     (SMDCMD),A
+        LD      B,03H
+l134f:  DJNZ    L134F
+        IN      A,(SMDSTAT)
+        LD      A,(L1548)
+        ADD     A,A
+        ADD     A,A
+        ADD     A,A
+        ADD     A,A
+        OUT     (SMDARG0),A
+        LD      A,10H
+        OUT     (SMDCMD),A
+        CALL    L13DF
+        JR      NC,L1369
+        LD      (IY+U_FDDONE),0FFH
+l1369:  LD      (IX+02H),0FFH
+        LD      (IX+05H),0FFH
+        RET
+
+l1372:  XOR     A
+        OUT     (SMDARG0),A
+        LD      A,50H
+        OUT     (SMDARG1),A
+        LD      A,80H
+        OUT     (SMDCMD),A
+        LD      B,03H
+l137f:  DJNZ    L137F
+        IN      A,(SMDSTAT)
+        XOR     A
+        OUT     (SMDARG1),A
+        OUT     (SMDCMD),A
+        CALL    L13AF
+        JR      C,L13AE
+        LD      (IY+U_WORK3),00H
+        LD      HL,0FFFFH
+        LD      (IX+00H),L
+        LD      (IX+01H),H
+        LD      (IX+03H),L
+        LD      (IX+04H),H
+        LD      (IX+0AH),L
+        LD      (IX+0BH),H
+        LD      (IX+05H),0FFH
+        LD      (IX+02H),0FFH
+l13ae:  RET
+
+l13af:  LD      B,38H
+l13b1:  DJNZ    L13B1
+        IN      A,(SMDSTAT)
+l13b5:  IN      A,(SMDSTAT)
+        LD      B,A
+        BIT     5,B
+        JR      NZ,L13C0
+        BIT     0,B
+        JR      NZ,L13C8
+l13c0:  LD      A,01H
+        LD      (IY+U_FDDONE),0FFH
+        JR      L13DD
+l13c8:  XOR     0D0H
+        AND     0D0H
+        JR      Z,L13D2
+        RST     08H
+        LD      C,A
+        JR      L13B5
+l13d2:  LD      A,B
+        AND     02H
+        JR      Z,L13DE
+        LD      A,08H
+        LD      (IY+U_WORK3),0FFH
+l13dd:  SCF
+l13de:  RET
+
+l13df:  LD      B,02H
+l13e1:  DJNZ    L13E1
+        IN      A,(SMDSTAT)
+l13e5:  IN      A,(SMDSTAT)
+        XOR     41H
+        AND     41H
+        JR      Z,L13F2
+        DJNZ    L13E5
+        SCF
+        LD      A,01H
+l13f2:  RET
+
+l13f3:  LD      A,(L1535)
+        OR      A
+        JR      NZ,L13FC
+        LD      A,(L153A)
+l13fc:  DEC     A
+        LD      (IY+U_WORK5),A
+l1400:  LD      A,(IY+U_WORK5)
+        OUT     (SMDSCID),A
+        CALL    L1509
+        OUT     (SMDSEC),A
+        XOR     A
+        OUT     (SMDCMD),A
+        OUT     (SMDSCID),A
+        OUT     (SMDARG0),A
+        OUT     (SMDARG1),A
+        LD      A,88H
+        OUT     (SMDCMD),A
+        CALL    L1479
+        JR      NC,L1434
+        CP      04H
+        JR      NZ,L145E
+        LD      A,(L153A)
+        LD      B,A
+        LD      A,(IY+U_WORK5)
+        INC     A
+        LD      (IY+U_WORK5),A
+        CP      B
+        JR      C,L1400
+        LD      (IY+U_WORK5),00H
+        JR      L1400
+l1434:  OUT     (SMDSCID),A
+        NOP
+        IN      A,(SMDDATA)
+        CP      0AAH
+        JR      NZ,L1450
+        IN      A,(SMDDATA)
+        LD      (IX+0BH),A
+        IN      A,(SMDDATA)
+        LD      (IX+0AH),A
+        IN      A,(SMDDATA)
+        LD      (IX+09H),A
+        LD      A,0AAH
+        JR      L145D
+l1450:  LD      B,03H
+        CALL    L145F
+        JR      NC,L145E
+        LD      A,08H
+        LD      (IY+U_WORK3),0FFH
+l145d:  SCF
+l145e:  RET
+
+l145f:  OUT     (SMDSCID),A
+        PUSH    DE
+        PUSH    IX
+        POP     HL
+        LD      A,(L1555)
+        LD      E,A
+        LD      D,00H
+        ADD     HL,DE
+        POP     DE
+l146d:  IN      A,(SMDDATA)
+        CP      (HL)
+        JR      NZ,L1477
+        DEC     HL
+        DJNZ    L146D
+        JR      L1478
+l1477:  SCF
+l1478:  RET
+
+l1479:  LD      B,02H
+l147b:  DJNZ    L147B
+        IN      A,(SMDSTAT)
+l147f:  IN      A,(SMDSTAT)
+        LD      B,A
+        BIT     5,B
+        JR      NZ,L148A
+        BIT     0,B
+        JR      NZ,L1492
+l148a:  LD      A,01H
+        LD      (IY+U_FDDONE),0FFH
+        JR      L149F
+l1492:  XOR     0D0H
+        AND     0D0H
+        JR      NZ,L147F
+        XOR     A
+        BIT     2,B
+        JR      Z,L14A0
+        LD      A,04H
+l149f:  SCF
+l14a0:  RET
+
+l14a1:  OUT     (SMDSCID),A
+        XOR     A
+        OUT     (SMDARG0),A
+        OUT     (SMDARG1),A
+        OUT     (SMDCMD),A
+        LD      A,(L1535)
+        CALL    L1509
+        JR      C,L1508
+        OUT     (SMDSEC),A
+        LD      (IX+08H),A
+        LD      A,(IY+U_OPER)
+        CP      81H
+        JR      NZ,L14D4
+        PUSH    IX
+        POP     HL
+        LD      A,(L1555)
+        LD      C,A
+        LD      B,00H
+        ADD     HL,BC
+        LD      BC,0444H                ; Write 4 bytes to the SMD FIFO
+        OTDR
+        LD      HL,(L1533)
+        OTIR
+        OUT     (SMDSCID),A
+l14d4:  LD      A,(IY+U_OPER)
+        OUT     (SMDCMD),A
+        CALL    L1479
+        JR      C,L1508
+        OUT     (SMDSCID),A
+        LD      A,(IY+U_OPER)
+        CP      81H
+        JR      Z,L14F8
+        LD      B,04H
+        CALL    L145F
+        LD      A,07H
+        JR      C,L1508
+        LD      BC,SMDDATA              ; Read 256 bytes from the SMD FIFO
+        LD      HL,(L1533)
+        INIR
+l14f8:  LD      (L1533),HL
+        LD      A,(L1535)
+        INC     A
+        LD      (L1535),A
+        DEC     (IY+U_SCNT)
+        JR      NZ,L14A1
+        XOR     A
+l1508:  RET
+
+l1509:  OR      A
+        LD      E,A
+        LD      A,(L1596)
+        DEC     A
+        JR      Z,L152E
+        CP      08H
+        JR      NZ,L152B
+        LD      D,00H
+        LD      H,D
+        LD      L,E
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,DE
+        XOR     A
+        LD      DE,(L153A)
+l1522:  SBC     HL,DE
+        JR      NC,L1522
+        ADD     HL,DE
+        LD      A,L
+        OR      A
+        JR      L152E
+l152b:  LD      A,05H
+        SCF
+l152e:  RET
+
+L152F:  DW      0FFFFH
+L1531:  DW      0FFFFH
+L1533:  DW      0
+L1535:  DW      0
+L1537:  DC      0FFH
+L1538:  DW      0FFFFH
+L153A:  DW      0
+L153C:  DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      000FFH
+        DW      0FFFFH
+        DW      0FFFFH
+L1548:  DC      0
+L1549:  DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      000FFH
+        DW      0FFFFH
+        DW      0FFFFH
+L1555:  DC      11
+L1556:  DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0
+        DW      0
+        DC      01H,55H
+        DC      3,64
+        DW      1
+        DW      0
+        DC      01H,55H
+        DC      3,64
+        REPT    32
+        DC      0FFH
+L1596:  DB      9
+        DS      3
+
+        COPY    IBC
+        COPY    UCBDEFS
+
+        END

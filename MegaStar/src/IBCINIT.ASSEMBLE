@@ -1,0 +1,111 @@
+    TITLE   'IBC Super Cadet Initialization Routines'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$IPL:  REL
+;
+        ENTRY   INITINT
+
+        EXTRN   IBCSECOND
+        EXTRN   IBCTICK
+        EXTRN   FDCISR
+
+INITINT:        ; l565d
+        DI
+        LD      A,00H
+        OUT     (34H),A
+        LD      A,08H
+        OUT     (30H),A
+        LD      A,10H
+        OUT     (2CH),A
+        LD      A,18H
+        OUT     (20H),A
+        LD      A,I
+        LD      H,A
+        LD      A,00H
+        ADD     A,A
+        LD      L,A
+        LD      DE,IBCTICK      ; Timer tick interrupt handler
+        LD      (HL),E
+        INC     HL
+        LD      (HL),D
+        LD      A,01H
+        ADD     A,A
+        LD      L,A
+        LD      DE,IBCSECOND    ; Seconds tick interrupt handler
+        LD      (HL),E
+        INC     HL
+        LD      (HL),D
+        LD      A,0C7H
+        OUT     (35H),A
+        LD      A,(0003H)
+        OUT     (35H),A
+        LD      A,27H
+        OUT     (31H),A
+        LD      A,(0004H)
+        OUT     (31H),A
+        LD      A,03H
+        OUT     (00H),A
+        OUT     (02H),A
+        OUT     (04H),A
+        OUT     (06H),A
+        OUT     (08H),A
+        OUT     (0AH),A
+        OUT     (0CH),A
+        OUT     (0EH),A
+        OUT     (10H),A
+        OUT     (12H),A
+        LD      A,02H
+        LD      DE,FDCISR
+        SC      103                 ; PUTVEC: A=IRQ, DE=transfer address
+        LD      A,0C7H
+        OUT     (32H),A
+        OUT     (33H),A
+        OUT     (2CH),A
+        OUT     (2DH),A
+        OUT     (2EH),A
+        OUT     (2FH),A
+        OUT     (20H),A
+        OUT     (21H),A
+        OUT     (22H),A
+        OUT     (23H),A
+        LD      A,01H
+        OUT     (32H),A
+        OUT     (33H),A
+        OUT     (2CH),A
+        OUT     (2DH),A
+        OUT     (2EH),A
+        OUT     (2FH),A
+        OUT     (20H),A
+        OUT     (21H),A
+        OUT     (22H),A
+        OUT     (23H),A
+        RET
+
+        COPY    IBC
+        END

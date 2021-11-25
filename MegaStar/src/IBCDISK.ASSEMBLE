@@ -1,0 +1,349 @@
+    TITLE   'IBC Super Cadet Disk Driver'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$DISKIO:   REL
+
+        ENTRY   IBCDISK
+
+        EXTRN   FLPRD
+        EXTRN   FLPWR
+        EXTRN   HDRD
+        EXTRN   HDWR
+        EXTRN   L1556
+;
+; transfer vectors
+;
+IBCDISK:    ; L159A
+        JP      SELECT
+        RET
+        NOP
+        NOP
+        JP      READ
+        JP      WRITE
+;
+        LD      D,(HL)
+        DEC     D
+        LD      HL,(2D17H)
+        RLA
+;
+        SUBT    'Select and Restore Routines'
+;
+; select entry
+;
+SELECT:
+;
+; phy drive code in reg A
+;
+; build drive select code
+;
+        LD      (IY+U_DRIVE),A
+        RET
+;
+; read entry
+;
+        SUBT    'Read/Write Setup Routines'
+; IY - Address of the UCB of the disk to be read from
+; A  - Number of consecutive sectors to read
+; B  - Head number
+; C  - Sector number
+; DE - cylinder number
+; HL - Address in memory that the information is to be read into.
+READ:   LD      (IY+U_OPER),00H         ; Read
+        JR      RWCOM
+WRITE:  LD      (IY+U_OPER),01H         ; Write
+RWCOM:  LD      (IY+U_SCNT),A
+        LD      (L171F),A
+        LD      A,(L172A)
+        CP      01H
+        JP      NZ,L16C1
+        LD      A,(IY+U_DRIVE)
+        PUSH    IY
+        SC      87                      ; GETLUB - IY - Base address of LUB table
+        CP      (IY+00H)
+        POP     IY
+        JP      NZ,L16D9
+        LD      (L1720),BC
+        LD      (L1722),DE
+        LD      (L1724),HL
+        CALL    CACHE3                  ; Convert C/H/S?
+        LD      (L1726),HL
+        LD      A,(IY+U_CCYLL)
+        CP      (IY+U_CCYLH)
+        JR      NZ,L15F3
+        DEC     A
+        JR      Z,L15FC
+l15f3:  LD      B,(IY+U_DRIVE)
+        LD      A,(L172C)
+        CP      B
+        JR      Z,L160F
+l15fc:  LD      A,(IY+U_DRIVE)
+        LD      (L172C),A
+        LD      DE,L172E                ; Zero out 128 bytes of RAM from 172D-17AC
+        LD      HL,L172D
+        LD      BC,127
+        LD      (HL),00H
+        LDIR
+l160f:  LD      HL,(L1726)
+        LD      A,03H
+        CP      H
+        JP      C,L16CE
+        XOR     A
+        CP      H
+        JR      NZ,L1621
+        INC     A
+        CP      L
+        JP      Z,L16CE
+l1621:  LD      A,(IY+U_OPER)
+        OR      A
+        JR      NZ,L165E
+        PUSH    HL
+        CALL    L1818
+        LD      A,(HL)
+l162c:  RRA
+        DJNZ    L162C
+        POP     HL
+        JR      NC,L165E
+        EX      DE,HL
+        LD      HL,(L1724)
+        LD      A,01H
+        CALL    CACHE1
+        LD      (L1726),DE
+        LD      (L1724),HL
+        LD      A,(L1720)
+        INC     A
+        LD      (L1720),A
+        DEC     (IY+U_SCNT)
+        LD      A,(IY+U_SCNT)
+        LD      (L171F),A
+        JR      NZ,L160F
+        LD      BC,(L1720)
+        LD      DE,(L1722)
+l165c:  OR      A
+        RET
+
+l165e:  LD      A,(IY+U_DRIVE)
+        ADD     A,A
+        ADD     A,A
+        ADD     A,A
+        LD      HL,L1556
+        LD      E,A
+        LD      D,00H
+        ADD     HL,DE
+        BIT     7,(HL)
+        LD      BC,(L1720)
+        LD      DE,(L1722)
+        LD      HL,(L1724)
+        LD      A,(IY+U_OPER)
+        JR      Z,L1692
+        CP      00H
+        LD      A,(IY+U_SCNT)
+        JR      NZ,L168B
+        CALL    FLPRD
+        JR      NZ,L165C
+        JR      L16A5
+l168b:  CALL    FLPWR
+        JR      NZ,L165C
+        JR      L16A5
+l1692:  CP      00H
+        LD      A,(IY+U_SCNT)
+        JR      NZ,L16A0
+        CALL    HDRD
+        JR      NZ,L165C
+        JR      L16A5
+l16a0:  CALL    HDWR
+        JR      NZ,L165C
+l16a5:  PUSH    AF
+        PUSH    BC
+        PUSH    DE
+        PUSH    HL
+        LD      (IY+U_OPER),01H
+        LD      DE,(L1726)
+        LD      HL,(L1724)
+        LD      A,(L171F)
+        CALL    CACHE2
+        POP     HL
+        POP     DE
+        POP     BC
+        POP     AF
+        JP      L165C
+l16c1:  CP      02H
+        JR      NZ,L16D9
+        LD      A,(IY+U_DRIVE)
+        CP      07H
+        JR      Z,L1707
+        JR      L16D9
+l16ce:  LD      BC,(L1720)
+        LD      DE,(L1722)
+        LD      HL,(L1724)
+l16d9:  LD      A,(IY+U_DRIVE)
+        ADD     A,A
+        ADD     A,A
+        ADD     A,A
+        PUSH    HL
+        PUSH    DE
+        LD      HL,L1556
+        LD      E,A
+        LD      D,00H
+        ADD     HL,DE
+        BIT     7,(HL)
+        POP     DE
+        POP     HL
+        LD      A,(IY+U_OPER)
+        JR      Z,L16FC
+        CP      01H
+        LD      A,(IY+U_SCNT)
+        JP      Z,FLPWR
+        JP      FLPRD
+
+l16fc:  CP      01H
+        LD      A,(IY+U_SCNT)
+        JP      Z,HDWR                  ; HDWR
+        JP      HDRD                    ; HDRD
+
+l1707:  PUSH    DE
+        PUSH    BC
+        LD      A,B
+        RRCA
+        OR      C
+        LD      D,E
+        LD      E,A
+        LD      A,(IY+U_SCNT)
+        CALL    CACHE1
+        POP     BC
+        LD      A,(IY+U_SCNT)
+        ADD     A,C
+        LD      C,A
+        POP     DE
+        XOR     A
+        JP      L165C
+
+L171F:  DS      1
+L1720:  DS      2
+L1722:  DS      2
+L1724:  DS      2
+L1726:  DS      2
+        DS      2
+L172A:  DS      1
+        DS      1
+L172C:  DS      1
+L172D:  DS      1
+L172E:  DS      127
+
+; IBC CACHE
+CACHE1: NOP
+        NOP
+        NOP
+CACHE2: PUSH    AF
+        LD      A,D
+        OUT     (0E0H),A
+        LD      C,0E3H
+        LD      B,00H
+        LD      A,E
+        OUT     (0E1H),A
+        OUT     (0E2H),A
+        BIT     0,(IY+U_OPER)
+        JR      NZ,L17C7
+        INIR
+        JR      L17DB
+l17c7:  OTIR
+        PUSH    HL
+        PUSH    BC
+        PUSH    AF
+        LD      L,E
+        LD      H,D
+        CALL    L1818
+        XOR     A
+        SCF
+l17d3:  RLA
+        DJNZ    L17D3
+        OR      (HL)
+        LD      (HL),A
+        POP     AF
+        POP     BC
+        POP     HL
+l17db:  INC     DE
+        POP     AF
+        DEC     A
+        JR      NZ,CACHE2
+        RET
+
+CACHE3: LD      L,(IY+U_NHDS)
+        LD      H,00H                   ; Number of heads in HL
+        SC      39                      ; 16x16 multiply heads*cyl, product in HL
+        LD      E,B
+        LD      D,00H
+        LD      B,D
+        ADD     HL,DE
+        LD      E,(IY+U_NSECT)
+        SC      39                      ; 16x16 multiply HL*DE, product in HL
+        ADD     HL,BC
+        INC     HL
+        LD      A,(IY+U_NSECT)
+        CP      26                      ; number of sectors for floppy
+        JR      NZ,L1816
+        ADD     A,A
+        BIT     0,(IY+U_NHDS)
+        JR      Z,L1803
+l1802:  RRA
+l1803:  DEC     H
+        INC     H
+        JR      NZ,L180F
+        CP      L
+        JR      C,L180F
+        CP      52
+        JR      Z,L1802
+        XOR     A
+l180f:  OR      A
+        RRA
+        LD      B,00H
+        LD      C,A
+        SBC     HL,BC
+l1816:  DEC     HL
+        RET
+
+l1818:  LD      A,L
+        AND     07H
+        LD      B,A
+        INC     B
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,HL
+        LD      L,H
+        LD      H,00H
+        PUSH    DE
+        LD      DE,L172D
+        ADD     HL,DE
+        POP     DE
+        RET
+        COPY    IBC
+        COPY    UCBDEFS
+
+        END
