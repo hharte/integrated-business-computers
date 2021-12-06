@@ -1,0 +1,190 @@
+    TITLE   'IBC Middi Cadet Initialization Routines'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$IPL:  REL
+;
+        ENTRY   INITINT
+;
+        EXTRN   IBCSECOND
+        EXTRN   IBCTICK
+        EXTRN   IBCTOD
+        EXTRN   IBCDAY
+        EXTRN   IBCDISK
+        EXTRN   FDCISR
+        EXTRN   IBCUSTOD
+        EXTRN   IBCUSDAY
+        EXTRN   USRTOD
+        EXTRN   USRDAY
+        EXTRN   L133F
+        EXTRN   L1357
+        EXTRN   L1376
+        EXTRN   L13D9
+        EXTRN   L13F6
+        EXTRN   L1426
+        EXTRN   L18CC
+;
+NUCUSTOD EQU    62H
+NUCUSDAY EQU    64H
+;
+INITINT:        ; L581C
+        DI
+        XOR     A
+        OUT     (1Ch),A
+        LD      A,I
+        LD      H,A
+        LD      A,00h
+        ADD     A,A
+        LD      L,A
+        LD      DE,IBCTICK
+        LD      (HL),E
+        INC     HL
+        LD      (HL),D
+;
+        LD      A,03h
+        OUT     (00h),A
+        OUT     (02h),A
+        OUT     (04h),A
+        OUT     (06h),A
+        OUT     (08h),A
+        OUT     (0Ah),A
+        OUT     (0Ch),A
+        OUT     (0Eh),A
+        OUT     (10h),A
+        OUT     (12h),A
+;
+        LD      DE,IBCTOD               ; 3406h
+        LD      (USRTOD),DE
+        LD      DE,IBCDAY               ; 342Ch
+        LD      (USRDAY),DE
+        LD      DE,IBCUSTOD
+        LD      (NUCUSTOD),DE
+        LD      DE,IBCUSDAY
+        LD      (NUCUSDAY),DE
+        LD      A,2                     ; IRQ 2
+        LD      DE,FDCISR               ; FDCISR = 1182H
+        SC      103                     ; PUTVEC: A=IRQ, DE=transfer address
+        XOR     A
+        OUT     (40h),A
+        OUT     (44h),A
+        LD      B,3
+L586D:  CALL    L1376
+        LD      A,0
+        JR      NC,L587B
+        SC      19
+        CALL    L1376
+        JR      C,L58E7
+L587B:  LD      A,90h
+        OUT     (40h),A
+        CALL    L1357
+        JR      C,L588C
+        XOR     A
+        OUT     (40h),A
+        CALL    L1376
+        JR      NC,L5895
+L588C:  XOR     A
+        OUT     (40h),A
+        OUT     (44h),A
+        OUT     (47h),A
+        JR      L586D
+L5895:  CALL    L13D9
+        AND     0Fh
+        JR      Z,L58A0
+        DJNZ    L586D
+        JR      L58E7
+
+L58A0:  IN      A,(44h)
+        CALL    L133F
+        JR      C,L588C
+        LD      DE,L13F6
+        LD      HL,IBCDISK
+        OR      A
+        SBC     HL,DE
+        LD      B,L
+        EX      DE,HL
+        LD      C,48h                   ; Read from HDC FIFO
+        INIR
+        OUT     (44h),A
+        OUT     (47h),A
+        LD      IX,L1426
+        LD      B,04h
+
+L58C0:  LD      L,(IX+06h)
+        LD      H,(IX+07h)
+        LD      E,(IX+02h)
+        LD      D,(IX+03h)
+        OR      A
+        SBC     HL,DE
+        LD      A,H
+        OR      L
+        JR      Z,L58E0
+        CP      03h
+        JR      Z,L58E0
+        DEC     DE
+        DEC     DE
+        DEC     DE
+        LD      (IX+02h),E
+        LD      (IX+03h),D
+L58E0:  LD      DE,000Ah
+        ADD     IX,DE
+        DJNZ    L58C0
+L58E7:  IN      A,(3Ch)
+        BIT     7,A
+        JR      NZ,L5900
+        LD      A,01h
+        OUT     (20h),A
+        LD      HL,L58FE
+        LD      DE,0066h
+        LD      BC,0002h
+        LDIR
+        JR      L5900
+L58FE:  IN      A,(3Fh)
+L5900:  LD      IX,050Dh
+        LD      L,(IX+02h)
+        LD      H,(IX+03h)
+        LD      E,(IX+08h)
+        LD      D,(IX+09h)
+        PUSH    HL
+        PUSH    DE
+        OR      A
+        SBC     HL,DE
+        POP     DE
+        POP     HL
+        JR      C,L5924
+        LD      L,00h
+        LD      A,0C0h
+        AND     H
+        LD      H,A
+        LD      (L18CC),HL
+        JR      L5928
+L5924:  LD      (L18CC),DE
+L5928:  RET
+
+        COPY    IBC
+        END
+

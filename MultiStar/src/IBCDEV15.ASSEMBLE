@@ -1,0 +1,24 @@
+          TITLE    'IBC MultiStar SIO Port 4 Driver'
+;*********************************************************************
+;
+;          O  A  S  I  S
+;
+;   Phase One Systems, Incorporated
+;   7700 Edgewater Drive, #830
+;   Oakland, California 94621
+;
+;   (415) 562-8085
+;
+;   Copyright 1980, 1981, 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system or trans-
+;   mitted, in any form or by any means, electronic,
+;   mechanical, photocopying, recording, or otherwise,
+;   without the prior written permission of Phase One
+;   Systems.
+;
+;*********************************************************************
+DEV15:    REL
+          IBC6850   06H,7   ; Port / Vector
+          END

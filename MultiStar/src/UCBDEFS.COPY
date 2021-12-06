@@ -1,0 +1,16 @@
+;
+; OASIS UCB Definitions
+;
+U_NHDS  EQU     0AH                     ; UCB Offset for number of heads
+U_NCYLS EQU     0BH                     ; UCB Offset for number of cylinders
+U_NSECT EQU     0DH                     ; UCB Offset for number of sectors
+U_CCYLL EQU     14H                     ; UCB Offset for current cylinder (Low byte)
+U_CCYLH EQU     15H                     ; UCB Offset for current cylinder (High byte)
+U_STDT  EQU     17H                     ; UCB Offset for Step Time Delay
+U_SEDT  EQU     18H                     ; UCB Offset for Settle Time Delay
+U_DRIVE EQU     19H                     ; UCB Offset for physical drive number
+U_OPER  EQU     1AH                     ; UCB Offset for Operation to perform: 0=read, 1=write
+U_SCNT  EQU     1BH                     ; UCB Offset for number of consecutive sectors to read/write.
+U_WORK3 EQU     1CH                     ; UCB Offset for Work Area byte 3.
+U_FDDONE EQU    1DH                     ; UCB Offset for FDC Command Complete (set to FFH in ISR.)
+U_WORK5 EQU     1EH                     ; UCB Offset for Work Area byte 5.

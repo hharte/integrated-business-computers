@@ -1,0 +1,82 @@
+NAME NUCLEUS.SEGMENT2:S
+;
+;
+INCLUDE N$BASE          ; Low memory assignments
+INCLUDE N$MU            ; Multi user definitions
+INCLUDE N$SNU           ; Select next user, ACTIVATE
+INCLUDE N$IPAGE         ; Interrupt page vectors (mode 2 only)
+INCLUDE N$SEGMEN        ; Overlay manager
+INCLUDE N$SC            ; System Call dispatch
+INCLUDE N$DISKIO        ; Disk I/O interface
+INCLUDE N$KEYIN         ; Console input line
+INCLUDE N$DISPLA        ; DISPLAY, SYSDISP
+INCLUDE N$CONIN         ; CONIN, SYSIN, CONST
+INCLUDE N$CONOUT        ; CONOUT, SYSOUT
+INCLUDE N$PRINT         ; PRTOUT, PRINT
+INCLUDE N$DEVICE        ; DEVINIT, DEVIN, DEVST, DEVOUT, DEVUNINI, PUTDEV
+INCLUDE N$NUMBER        ; NUMBER, HEXI, HEXO, DECI, DECO
+INCLUDE N$MULDIV        ; 16 bit multiply/divide
+INCLUDE N$RECLOC        ; Record/file locks
+INCLUDE N$BYTE          ; GETBYTE, PUTBYTE
+INCLUDE N$EXCLUS        ; Lock maintenance
+INCLUDE N$PEEK          ; Peek at CONOUT
+INCLUDE N$MSG           ; Message sender
+INCLUDE N$DIRECT        ; Directory management
+INCLUDE N$ALLOC         ; Disk space management
+INCLUDE N$DATE          ; Date & time conversion
+INCLUDE N$CLOCK         ; TOD, MSEC, DELAY
+INCLUDE N$TIMER         ; TEB maintenance
+INCLUDE N$UTILIT        ; Set & point to various areas
+INCLUDE N$MISC          ; Internal subroutines
+INCLUDE N$COMPAR        ; COMPARE, DISPATCH
+INCLUDE N$ESC           ; Console esc key maintenance
+INCLUDE N$SEQIO         ; Non disk sequential I/O
+;
+; Overlay region 2
+;
+INCLUDE N$OVLY2
+INCLUDE N$OPEN          ; Logical file open
+INCLUDE N$CLOSE         ; Logical file close
+INCLUDE N$SEQDIO        ; Sequential disk I/O
+INCLUDE N$DIRIO         ; Direct file I/O
+;
+; Start of user area (SCR)
+;
+IGNORE SCR,IPL,IPLEND
+;
+INCLUDE N$MUIM2         ; INT MODE 2
+;
+INCLUDE IBCMC           ; CLOCKS
+INCLUDE IBCBANK         ; Bank select routine
+INCLUDE IBCFDC          ; Floppy disk driver
+INCLUDE IBCHDC          ; SMD hard disk driver
+INCLUDE IBCDISK         ; Disk driver dispatch and CACHE
+;
+IGNORE DISK0,DISK1,DISK2,DISK3,DISK4,DISK5,DISK6,DISK7
+SET NUCLEUS+3EH=255
+ORIGIN 0
+;IGNORE RST10,RST18,RST20,RST28,RST30,RST38,NMI
+;
+; The following defines are used in case the symbol
+; has not been defined yet.
+;
+DEFINE RST0=RET
+DEFINE RST8=RET
+DEFINE RST10=RET
+DEFINE RST18=RET
+DEFINE RST20=RET
+DEFINE RST28=RET
+DEFINE RST30=RET
+DEFINE RST38=DEBUG
+DEFINE FREQADJ=RET
+DEFINE NMI=RET
+DEFINE STARTRTC=RET
+DEFINE STOPRTC=RET
+DEFINE ESCI=RET
+DEFINE RTCINT=RET
+DEFINE BANKSEL=RET
+DEFINE DECRCNT=RET
+DEFINE INCRCNT=RET
+DEFINE PUTVECT=RET
+;
+END

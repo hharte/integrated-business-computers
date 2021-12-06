@@ -1,0 +1,208 @@
+    TITLE   'IBC Middi Cadet Routines'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+        SUBT    'Clock Routines'
+N$CLOCK:    REL
+;
+        ENTRY   STARTRTC
+        ENTRY   STOPRTC
+        ENTRY   IBCTICK
+        ENTRY   IBCTOD
+        ENTRY   IBCDAY
+        ENTRY   IBCUSTOD
+        ENTRY   IBCUSDAY
+;
+        EXTRN   SECOND
+        EXTRN   TICK
+;
+;
+; RTC routines
+;
+STARTRTC:                               ; l33f1
+        PUSH    AF
+        LD      A,0FEH
+        OUT     (TIMER),A
+        POP     AF
+        RET
+;
+STOPRTC:                                ; l33f8
+        PUSH    AF
+        IN      A,(TIMER)
+        POP     AF
+        RET
+
+IBCTICK:                                ; L33FD
+        CALL    STOPRTC                 ; Clear timer interrupt
+        CALL    STARTRTC                ; Reset timer
+        JP      TICK                    ; L36A1
+
+IBCTOD:                                 ; l3406
+        LD      C,RTC_TSEC
+        IN      A,(C)
+        IN      A,(C)
+        AND     0FH
+        LD      H,A
+        INC     C
+        CALL    RTC_RD
+        LD      (NUCSEC),A
+        CALL    RTC_RD
+        LD      (NUCMIN),A
+        CALL    RTC_RD
+        LD      (NUCHOUR),A
+        LD      C,RTC_TSEC
+        IN      A,(C)
+        AND     0FH
+        CP      H
+        JR      NZ,IBCTOD
+        RET
+
+IBCDAY: LD      C,RTC_TSEC              ; L342C
+        IN      A,(C)
+        IN      A,(C)
+        AND     0FH
+        LD      H,A
+        LD      C,RTC_DAYS
+        CALL    RTC_RD
+        INC     C
+        LD      (NUCDAY),A
+        CALL    RTC_RD
+        LD      (NUCMON),A
+        LD      C,RTC_TSEC
+        IN      A,(C)
+        AND     0FH
+        CP      H
+        JR      NZ,IBCDAY
+        RET
+;
+; Read RTC
+RTC_RD: IN      A,(C)                   ; l344e
+        AND     0FH
+        CP      0FH
+        JR      NZ,RTC_RD1
+        XOR     A
+RTC_RD1:
+        LD      B,A
+        INC     C
+        IN      A,(C)
+        SLA     A
+        SLA     A
+        SLA     A
+        SLA     A
+        AND     0F0H
+        CP      0F0H
+        JR      NZ,RTC_RD2
+        XOR     A
+RTC_RD2:
+        OR      B
+        INC     C
+        RET
+
+IBCUSTOD:                               ; L346D
+        XOR     A
+        OUT     (RTC_START),A
+        LD      C,RTC_INTR
+        XOR     A
+        OUT     (C),A
+        IN      A,(C)
+        IN      A,(C)
+        IN      A,(C)
+        LD      C,RTC_SECS
+        LD      A,(NUCSEC)
+        CALL    RTC_WR
+        LD      A,(NUCMIN)
+        CALL    RTC_WR
+        LD      A,(NUCHOUR)
+        CALL    RTC_WR
+        IN      A,(RTC_INTR)
+        IN      A,(RTC_INTR)
+        IN      A,(RTC_INTR)
+        LD      A,01H
+        OUT     (RTC_START),A
+        RET
+
+IBCUSDAY:                               ; L349A
+        CALL    STOPRTC
+        LD      C,RTC_DAYS
+        LD      A,(NUCDAY)
+        CALL    RTC_WR
+        INC     C
+        LD      A,(NUCMON)
+        CALL    RTC_WR
+        LD      A,(NUCYEAR)
+        LD      B,A
+        AND     0F0H
+        SRA     A
+        LD      C,A
+        SRA     A
+        SRA     A
+        ADD     A,C
+        LD      C,A
+        LD      A,B
+        AND     0FH
+        ADD     A,C
+        AND     03H
+        LD      B,A
+        LD      A,08H
+        INC     B
+l34c5:  SRA     A
+        DJNZ    L34C5
+        OUT     (RTC_YEARS),A
+        CALL    STARTRTC
+        RET
+;
+; Write RTC
+;
+; A - 8-bit value to be written
+;     Lower nibble to C.
+;     Upper nibble to C+1.
+;
+; Output - C+=2.
+RTC_WR: LD      B,A             ; L34CF
+        AND     0FH
+        OUT     (C),A
+        INC     C
+        LD      A,B
+        SRA     A
+        SRA     A
+        SRA     A
+        SRA     A
+        AND     0FH
+        OUT     (C),A
+        INC     C
+        RET
+;
+        SUBT    'ESC I Routine'
+N$ESC:  REL
+        ENTRY   ESCI
+ESCI:
+        RET
+;
+        COPY    IBC
+        END
+

@@ -1,0 +1,447 @@
+          TITLE    'IBC MultiStar Reel Tape Driver'
+;*********************************************************************
+;
+;          O  A  S  I  S
+;
+;   Phase One Systems, Incorporated
+;   7700 Edgewater Drive, #830
+;   Oakland, California 94621
+;
+;   (415) 562-8085
+;
+;   Copyright 1980, 1981, 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system or trans-
+;   mitted, in any form or by any means, electronic,
+;   mechanical, photocopying, recording, or otherwise,
+;   without the prior written permission of Phase One
+;   Systems.
+;
+;*********************************************************************
+; Disassembly of SYSTEM.DEV26_R_256
+IBCDEV26:    REL
+FAKESEL:
+        XOR     A           ; set nc,z
+        RET                 ; return
+        NOP                 ; filler
+        JP      FAKESEL
+        JP      FAKESEL
+        JP      FAKESEL
+        JP      FAKESEL
+
+TAPEDRV:
+;
+; enter with a = cmd code
+;
+; 80 = select drive and track
+; 81 = rewind
+; 82 = read
+; 83 = write
+; 84 = back space record
+; 85 = forward space record
+; 86 = write gap (erase)
+; 87 = write tape mark
+; 88 = stop the tape
+; 89 = return tape status
+;
+; return codes:
+; 00 Z   success
+; 01 NZ  not ready
+; 02 NZ  write protected
+; 03 NZ  tape mark
+; 04 NZ  crc error
+; 05 NZ  end of tape
+; 06 NZ  begin of tape
+; 07 NZ  data late
+;
+;************************************************
+        RST     38H
+        CP      80H         ; min
+        RET     C           ; return no good
+        CP      89H+1       ; max
+        CCF                 ; invert
+        RET     C           ; return no good
+;
+; dispatch to proper routine
+;
+        SUB     80H         ; strip off msb
+        PUSH    HL          ; save hl
+        PUSH    DE          ; and de
+        ADD     A,A         ; times two
+        LD      E,A         ; to de
+        LD      D,00H
+        LD      HL,DISPTAB  ; point table
+        ADD     HL,DE       ; sum
+        LD      E,(HL)      ; load address
+        INC     HL
+        LD      D,(HL)      ; msb
+        EX      DE,HL       ; to hl
+        POP     DE          ; restore de
+        EX      (SP),HL     ; get hl
+        RET                 ; jump indirect
+;
+; dispatch table
+;
+DISPTAB:
+        DC      (SEL)       ; Select
+        DC      (REW)       ; Rewind
+        DC      (RDB)       ; Read Block
+        DC      (WRB)       ; Write Block
+        DC      (BSR)       ; Backspace Record
+        DC      (FSR)       ; Forward Space Record
+        DC      (GAP)       ; Write Gap
+        DC      (WTM)       ; Write Tape Mark
+        DC      (STOP)      ; Stop Tape
+        DC      (GETST)     ; Get Status
+
+        SUBT 'Select unit, track'
+SEL:
+;
+; on entry:
+;  D = unit (0 - 3)
+;  E = track (0 - 3)
+;
+        LD      A,D
+        AND     03H
+        JR      NZ,L0054
+        LD      A,E
+        AND     03H
+        JR      NZ,L0054
+        LD      A,01H
+        LD      (L01F5),A
+        OUT     (65H),A
+        CALL    CHKRDY
+        JR      Z,L0057
+l0054:  LD      A,01H
+        OR      A
+l0057:  RET
+
+        SUBT 'Rewind routine'
+REW:
+;
+; rewind tape to loadpoint
+;
+; possible errors:
+; 00 success
+; 01 not ready
+;
+        CALL    CHKRDY
+        JR      NZ,L0075
+        BIT     6,B
+        JR      NZ,L0074
+        LD      A,(L01F5)
+        OR      10H
+        OUT     (65H),A
+        XOR     10H
+        OUT     (65H),A
+l006c:  IN      A,(65H)
+        AND     14H
+        XOR     04H
+        JR      NZ,L006C
+l0074:  XOR     A
+l0075:  RET
+
+        SUBT 'Backspace record'
+BSR:
+;
+; backspace one record
+;
+        CALL    CHKRDY
+        JR      NZ,L0087
+        LD      A,B
+        AND     40H
+        LD      A,06H
+        JR      NZ,L0087
+        LD      A,08H
+        CALL    L01DD
+l0087:  RET
+
+        SUBT 'Forward space record'
+FSR:
+;
+; forward space one record
+;
+        CALL    CHKRDY
+        JR      NZ,L0099
+        LD      A,B
+        AND     80H
+        LD      A,05H
+        JR      NZ,L0099
+        LD      A,00H
+        CALL    L01DD
+l0099:  RET
+
+        SUBT 'Write gap'
+GAP:
+;
+; Write gap
+;
+        CALL    CHKRDY
+        JR      NZ,L00B0
+        LD      A,B
+        AND     80H
+        LD      A,05H
+        JR      NZ,L00B0
+        LD      A,07H
+        OUT     (64H),A
+l00aa:  IN      A,(65H)
+        AND     03H
+        JR      NZ,L00AA
+l00b0:  RET
+
+        SUBT 'Write tape mark'
+WTM:
+;
+; Write tape mark
+;
+        CALL    CHKRDY
+        JR      NZ,L00C7
+        LD      A,B
+        AND     80H
+        LD      A,05H
+        JR      NZ,L00C7
+        LD      A,06H
+        OUT     (64H),A
+l00c1:  IN      A,(65H)
+        AND     03H
+        JR      NZ,L00C1
+l00c7:  RET
+
+        SUBT 'Stop tape'
+STOP:
+;
+; Stop tape
+;
+        CALL    CHKRDY
+        RET
+
+        SUBT 'Get tape status'
+GETST:
+;
+; return coded status in A:
+;
+; bit    meaning if high
+;  7     selected
+;  6     ready
+;  5     BOT
+;  4     EOT
+;  3     write protected
+;  2     busy
+;  1&0   max number of tracks (base zero)
+;
+;  D     has last unit selected
+;  E     has last track selected
+;
+        CALL    CHKRDY
+        JR      NZ,L00EE
+        LD      DE,0000
+        LD      A,80H
+        BIT     6,B
+        JR      Z,L00DC
+        SET     5,A
+l00dc:  BIT     7,B
+        JR      Z,L00E2
+        SET     4,A
+l00e2:  BIT     5,B
+        JR      Z,L00E8
+        SET     3,A
+l00e8:  BIT     2,B
+        JR      Z,L00EE
+        SET     6,A
+l00ee:  RET
+
+        SUBT 'Read block routine'
+;
+; on entry:
+; DE = block length >= 80
+; HL = buffer location
+;
+; possible errors:
+;  00 success
+;  01 not ready or not select
+;  03 tape mark
+;  04 crc
+;  05 eot (not an error)
+;  07 late
+;
+RDB:    CALL    CHKRDY
+        JR      NZ,L0153
+        LD      A,B
+        AND     80H
+        LD      A,05H
+        JR      NZ,L0153
+        PUSH    HL
+        ADD     HL,DE
+        PUSH    HL
+        LD      DE,L01F8
+        LD      BC,0002H
+        LDIR
+        POP     HL
+        EX      (SP),HL
+        LD      C,66H
+        LD      DE,0340H
+        DI
+        IN      A,(66H)
+        LD      A,00H
+        OUT     (64H),A
+l0114:  IN      A,(65H)
+        AND     D
+        JR      Z,L0122
+        IN      A,(64H)
+        AND     E
+        JR      Z,L0114
+        INI
+        JR      L0114
+l0122:  EI
+        CALL    L01D6
+        POP     DE
+        PUSH    BC
+        IN      A,(64H)
+        AND     80H
+        JR      NZ,L0130
+        DEC     HL
+        DEC     HL
+l0130:  XOR     A
+        SBC     HL,DE
+        PUSH    AF
+        LD      HL,L01F8
+        LD      BC,0002H
+        LDIR
+        POP     AF
+        POP     BC
+        JR      Z,L014B
+        LD      A,C
+        AND     04H
+        LD      A,03H
+        JR      NZ,L0153
+        LD      A,07H
+        JR      L0153
+l014b:  LD      A,C
+        AND     02H
+        LD      A,04H
+        JR      NZ,L0153
+        XOR     A
+l0153:  OR      A
+        RET
+
+        SUBT 'Write block routine'
+;
+; on entry:
+; DE = block length (min 80)
+; HL = buff address
+;
+; possible errors:
+;  00 success
+;  01 not ready
+;  02 write protect
+;  04 crc error
+;  05 eot (warning)
+;  07 late
+;
+WRB:    CALL    CHKRDY
+        JR      NZ,L01A9
+        LD      A,E
+        OR      A
+        JR      Z,L015F
+        INC     D
+l015f:  LD      A,B
+        AND     20H
+        LD      A,02H
+        JR      NZ,L01A9
+        EX      AF,AF'
+        PUSH    AF
+        LD      A,(L01F5)
+        OR      02H
+        EX      AF,AF'
+        LD      B,E
+        LD      E,20H
+        LD      C,66H
+        OUTI
+        DI
+        LD      A,04H
+        OUT     (64H),A
+l017a:  IN      A,(64H)
+        AND     E
+        JR      Z,L017A
+        OUTI
+        JR      NZ,L017A
+        DEC     D
+        JR      NZ,L017A
+        EX      AF,AF'
+        OUT     (65H),A
+        POP     AF
+        EX      AF,AF'
+        EI
+l018c:  IN      A,(65H)
+        AND     03H
+        JR      NZ,L018C
+        LD      A,(L01F5)
+        OUT     (65H),A
+        CALL    L01D6
+        LD      A,C
+        AND     02H
+        LD      A,04H
+        JR      NZ,L01A9
+        LD      A,B
+        AND     80H
+        LD      A,05H
+        JR      NZ,L01A9
+        XOR     A
+l01a9:  RET
+
+; Z = ready
+CHKRDY:
+        IN      A,(64H)
+        LD      C,A
+        IN      A,(65H)
+        LD      B,A
+        XOR     0CH
+        AND     0CH
+        LD      A,01H
+        JR      NZ,L01D5
+        LD      A,B
+        AND     03H
+        JR      Z,L01D5
+        LD      A,(L01F5)
+        RES     0,A
+        OUT     (65H),A
+        SET     0,A
+        OUT     (65H),A
+        LD      B,00H
+l01ca:  IN      A,(65H)
+        AND     03H
+        JR      Z,CHKRDY
+        DJNZ    L01CA
+        LD      A,01H
+        OR      A
+l01d5:  RET
+
+l01d6:  IN      A,(64H)
+        LD      C,A
+        IN      A,(65H)
+        LD      B,A
+        RET
+
+l01dd:  DI
+        PUSH    DE
+        LD      DE,0340H
+        OUT     (64H),A
+l01e4:  IN      A,(65H)
+        AND     D
+        JR      Z,L01F2
+        IN      A,(64H)
+        AND     E
+        JR      Z,L01E4
+        IN      A,(66H)
+        JR      L01E4
+l01f2:  POP     DE
+        EI
+        RET
+
+L01F5:  DC      01
+        DS      2
+L01F8:  DS      2
+
+        END
+

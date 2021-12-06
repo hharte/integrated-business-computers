@@ -1,0 +1,413 @@
+    TITLE   'IBC Middi Cadet MCC Hard Disk Driver'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$DISKIO:   REL
+
+        ENTRY   HDRD
+        ENTRY   HDWR
+        ENTRY   L133F
+        ENTRY   L1357
+        ENTRY   L1376
+        ENTRY   L13D9
+        ENTRY   L13F6
+        ENTRY   L1426
+;
+; IBC MCC Hard Disk Driver
+HDRD:   JP      MCCRD
+HDWR:   JP      MCCWR
+        OR      13H
+        LD      H,D
+        INC     D
+        LD      (IY+U_DRIVE),A
+        RET
+
+        RET
+
+MCCRD:  PUSH    AF
+        LD      A,81H
+        LD      (L13EF),A
+        POP     AF
+        JR      MCCCOM
+MCCWR:  PUSH    AF
+        LD      A,82H
+        LD      (L13EF),A
+        POP     AF
+MCCCOM: LD      (IY+U_SCNT),A
+        LD      (L13E6),BC
+        ADD     A,C
+        DEC     A
+        LD      B,A
+        LD      A,C
+        LD      (L13EE),A
+        LD      A,B
+        LD      BC,(L141E)
+        CP      C
+        LD      A,05H
+        JR      NC,L11FB
+        LD      (L13E8),DE
+        LD      (L13EA),HL
+        LD      (L13EC),HL
+        CALL    L11FD
+        LD      HL,(L13EA)
+        LD      DE,(L13E8)
+        LD      BC,(L13E6)
+        LD      A,(L13EE)
+        LD      C,A
+        LD      A,(IY+U_SCNT)
+l11fb:  OR      A
+        RET
+
+l11fd:  PUSH    IX
+        LD      IX,L13F6
+        LD      A,(IY+U_DRIVE)
+        ADD     A,A
+        ADD     A,A
+        LD      E,A
+        LD      D,00H
+        ADD     IX,DE
+        LD      A,(L13E5)
+        CP      (IX+00H)
+        JR      Z,L1230
+        LD      A,(IX+00H)
+        LD      (L13E5),A
+        LD      HL,L1426
+        OR      A
+        JR      Z,L1228
+        LD      DE,10
+        LD      B,A
+l1225:  ADD     HL,DE
+        DJNZ    L1225
+l1228:  LD      DE,L141A
+        LD      BC,10
+        LDIR
+l1230:  LD      HL,(L13E8)
+        LD      E,(IX+01H)
+        LD      D,(IX+02H)
+        ADD     HL,DE
+        LD      (L13F1),HL
+        LD      A,05H
+        JR      C,L127E
+        LD      DE,(L1420)
+        SBC     HL,DE
+        JR      NC,L127E
+        LD      A,(IX+03H)
+        OR      A
+        JP      M,L127B
+        LD      BC,(L13E6)
+        ADD     A,B
+        LD      (L13F4),A
+        LD      A,05H
+        JR      C,L127E
+        LD      A,(L13F4)
+        LD      BC,(L1422)
+        CP      C
+        LD      A,05H
+        JR      NC,L127E
+        LD      A,(IX+00H)
+        CP      04H
+        JR      NC,L127E
+        LD      IX,L13E5
+        LD      (L13F0),A
+        CALL    L1284
+        JR      L127E
+l127b:  LD      A,01H
+        SCF
+l127e:  POP     IX
+        LD      (IY+U_SCNT),A
+        RET
+
+l1284:  LD      A,(IY+U_SCNT)
+        CP      0AH
+        JR      C,L128D
+        LD      A,0AH
+l128d:  LD      (L13F5),A
+        LD      A,(L13EE)
+        LD      (L13F3),A
+        CALL    L12B6
+        JR      C,L12B5
+        LD      HL,(L13EC)
+        LD      (L13EA),HL
+        LD      A,(L13F5)
+        LD      B,A
+        LD      A,(L13EE)
+        ADD     A,B
+        LD      (L13EE),A
+        LD      A,(IY+U_SCNT)
+        SUB     B
+        LD      (IY+U_SCNT),A
+        JR      NZ,L1284
+l12b5:  RET
+
+l12b6:  PUSH    BC
+        LD      A,(L13EF)
+        CP      82H
+        JR      NZ,L12D7
+        CALL    L13A4
+        JP      C,L133A
+        OR      A
+        JR      Z,L12C9
+        OTIR
+l12c9:  DEC     D
+        JP      M,L12D1
+        OTIR
+        JR      L12C9
+l12d1:  OUT     (44H),A
+        EI
+        LD      (L13EC),HL
+l12d7:  CALL    L1376
+        JP      C,L133A
+        LD      HL,L13EF
+        DI
+        CALL    L1394
+        CALL    L1357
+        JP      C,L133A
+        LD      HL,L13F3
+        CALL    L1394
+        JP      C,L133A
+        EI
+        RST     08H
+        LD      C,A
+        CALL    L1376
+        JP      C,L133A
+        CALL    L13D9
+        LD      B,A
+        AND     0FH
+        JR      Z,L1310
+        CP      0AH
+        SCF
+        JR      NZ,L133A
+        BIT     6,A
+        LD      A,01H
+        SCF
+        JR      Z,L133A
+l1310:  LD      A,B
+        BIT     6,A
+        LD      A,01H
+        SCF
+        JR      Z,L133A
+        LD      A,(L13EF)
+        CP      82H
+        LD      A,00H
+        JR      Z,L133A
+        CALL    L13A4
+        JR      C,L133A
+        OR      A
+        JR      Z,L132B
+        INIR
+l132b:  DEC     D
+        JP      M,L1333
+        INIR
+        JR      L132B
+l1333:  OUT     (44H),A
+        EI
+        LD      (L13EC),HL
+        XOR     A
+l133a:  EI
+        OUT     (44H),A
+        POP     BC
+        RET
+
+L133f:  LD      HL,0FFFFH
+l1342:  CALL    L13D9
+        BIT     7,A
+        JR      Z,L1355
+        DEC     HL
+        LD      A,H
+        OR      L
+        JR      NZ,L1342
+        LD      A,11H
+        SCF
+        OUT     (44H),A
+        JR      L1356
+l1355:  XOR     A
+l1356:  RET
+
+l1357:  LD      HL,0FFFFH
+l135a:  CALL    L13D9
+        AND     30H
+        CP      30H
+        JR      Z,L1374
+        DEC     HL
+        LD      A,H
+        OR      L
+        JR      NZ,L135A
+        OUT     (40H),A
+        LD      A,01H
+        OUT     (44H),A
+        OUT     (47H),A
+        EI
+        SCF
+        JR      L1375
+l1374:  XOR     A
+l1375:  RET
+
+l1376:  LD      HL,0FFFFH
+l1379:  CALL    L13D9
+        AND     10H
+        JR      Z,L1392
+        RST     08H
+        LD      C,A
+        DEC     HL
+        LD      A,H
+        OR      L
+        JR      NZ,L1379
+        OUT     (40H),A
+        LD      A,11H
+        OUT     (44H),A
+        OUT     (47H),A
+        SCF
+        JR      L1393
+l1392:  XOR     A
+l1393:  RET
+
+l1394:  LD      C,43H
+        LD      DE,0003H
+        ADD     HL,DE
+        LD      B,04H
+l139c:  LD      A,(HL)
+        OUT     (C),A
+        DEC     HL
+        DEC     C
+        DJNZ    L139C
+        RET
+
+l13a4:  CALL    L1376
+        JR      C,L13D8
+        LD      A,8BH
+        DI
+        OUT     (40H),A
+        CALL    L1357
+        JR      C,L13D8
+        XOR     A
+        OUT     (40H),A
+        EI
+        CALL    L1376
+        JR      C,L13D8
+        LD      DE,0100H
+        LD      HL,0
+        LD      A,(L13F5)
+        LD      B,A
+l13c6:  ADD     HL,DE
+        DJNZ    L13C6
+        EX      DE,HL
+        IN      A,(44H)
+        CALL    L133F
+        JR      C,L13D8
+        LD      HL,(L13EC)
+        LD      C,48H
+        LD      B,E
+        LD      A,B
+l13d8:  RET
+
+l13d9:  PUSH    BC
+        IN      A,(40H)
+        LD      B,A
+l13dd:  IN      A,(40H)
+        CP      B
+        LD      B,A
+        JR      NZ,L13DD
+        POP     BC
+        RET
+
+L13E5:  DC      0FFH
+L13E6:  DW      0FFFFH
+L13E8:  DW      0FFFFH
+L13EA:  DW      0
+L13EC:  DW      0
+L13EE:  DC      0
+L13EF:  DC      0
+L13F0:  DC      0
+L13F1:  DW      0
+L13F3:  DC      0
+L13F4:  DC      0
+L13F5:  DC      0
+L13F6:  DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0
+L1400:  DW      0
+        DC      1
+        DC      0,0,0
+        DC      2
+        DC      0,0,0
+        DC      3
+        DC      0,0,0
+L140E:  DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0FFFFH
+        DW      0
+        DW      0
+L141A:  DC      6
+        DC      0
+        DW      012FH
+L141E:  DW      0020H
+L1420:  DW      012FH
+L1422:  DC      6
+        DC      0
+        DC      0,0
+L1426:  DC      6
+        DC      0
+        DW      012FH
+        DC      20H
+        DC      0
+L142C:  DW      012FH
+        DC      6
+        DC      0
+        DC      6
+        DC      0
+L1432:  DW      012FH
+        DC      20H
+        DC      0
+L1436:  DW      012FH
+        DC      6
+        DC      0
+        DC      6
+        DC      0
+L143C:  DW      012FH
+        DC      20H
+        DC      0
+L1440:  DW      012FH
+        DC      6
+        DC      0
+        DC      6
+        DC      0
+L1446:  DW      012FH
+        DC      20H
+        DC      0
+L144A:  DW      012FH
+        DC      6
+        DC      0
+        DS      20
+
+        COPY    IBC
+        COPY    UCBDEFS
+
+        END

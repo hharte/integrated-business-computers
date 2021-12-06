@@ -1,0 +1,496 @@
+    TITLE   'IBC Middi Cadet Disk Driver'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$DISKIO:   REL
+
+        ENTRY   IBCDISK
+        ENTRY   L18CC
+
+        EXTRN   FLPRD
+        EXTRN   FLPWR
+        EXTRN   HDRD
+        EXTRN   HDWR
+;
+; transfer vectors
+;
+IBCDISK:    ; L1462
+        JP      SELECT  ; 1478
+        RET
+        NOP
+        NOP
+        JP      READ    ; 147C
+        JP      WRITE   ; 1482
+;
+L146E:  DC      0F6H,13H,0E4H,15H,0E9H,15H,8AH,18H,0E7H,15H
+;
+        SUBT    'Select and Restore Routines'
+;
+; select entry
+;
+SELECT:
+;
+; phy drive code in reg A
+;
+; build drive select code
+;
+        LD      (IY+U_DRIVE),A
+        RET
+;
+; read entry
+;
+        SUBT    'Read/Write Setup Routines'
+; IY - Address of the UCB of the disk to be read from
+; A  - Number of consecutive sectors to read
+; B  - Head number
+; C  - Sector number
+; DE - cylinder number
+; HL - Address in memory that the information is to be read into.
+READ:   LD      (IY+U_OPER),00H         ; Read
+        JR      RWCOM
+WRITE:  LD      (IY+U_OPER),01H         ; Write
+RWCOM:  NOP
+        LD      (IY+U_SCNT),A
+        LD      (L15D9),A
+        LD      A,(L15E4)
+        CP      01H
+        JP      NZ,L1589
+
+        LD      A,(IY+U_DRIVE)
+        PUSH    IY
+        SC      87                      ; GETLUB - IY - Base address of LUB table
+        CP      (IY+00H)
+        POP     IY
+        JP      NZ,L15A1
+        LD      (L15DA),BC
+        LD      (L15DC),DE
+        LD      (L15DE),HL
+        CALL    L183F                     ; CACHE3                  ; Convert C/H/S?
+        LD      (L15E0),HL
+        LD      A,(IY+U_CCYLL)
+        CP      (IY+U_CCYLH)
+        JR      NZ,l14c0
+        DEC     A
+        JR      Z,l14c9
+l14c0:  LD      B,(IY+U_DRIVE)
+        LD      A,(L15E6)
+        CP      B
+        JR      Z,l14dc
+l14c9:  LD      A,(IY+U_DRIVE)
+        LD      (L15E6),A
+        LD      DE,L15EA                ; Zero out 128 bytes of RAM from 172D-17AC
+        LD      HL,L15E9
+        LD      BC,255
+        LD      (HL),00H
+        LDIR
+l14dc:  LD      HL,(L15E0)
+        LD      DE,(L15E7)
+        XOR     A
+        SBC     HL,DE
+        JP      NC,L1596
+        LD      HL,(L15E0)
+        DEC     HL
+        LD      A,L
+        OR      H
+        INC     HL
+        JP      Z,L1596
+        LD      A,(IY+U_OPER)
+        OR      A
+        JR      NZ,L1530
+        PUSH    HL
+        CALL    L1876
+        LD      A,(HL)
+l14fe:  RRA
+        DJNZ    L14FE
+        POP     HL
+        JR      NC,L1530
+        EX      DE,HL
+        LD      HL,(L15DE)
+        LD      A,01H
+        CALL    L16E9
+        LD      (L15E0),DE
+        LD      (L15DE),HL
+        LD      A,(L15DA)
+        INC     A
+        LD      (L15DA),A
+        DEC     (IY+U_SCNT)
+        LD      A,(IY+U_SCNT)
+        LD      (L15D9),A
+        JR      NZ,L14DC
+        LD      BC,(L15DA)
+        LD      DE,(L15DC)
+l152e:  OR      A
+        RET
+
+l1530:  LD      BC,(L15DA)
+        LD      DE,(L15DC)
+        LD      HL,(L15DE)
+        LD      A,(IY+U_DRIVE)
+        CP      02H
+        LD      A,(IY+U_OPER)
+        JR      NC,L155A
+        CP      00H
+        LD      A,(IY+U_SCNT)
+        JR      NZ,L1553
+        CALL    FLPRD
+        JR      NZ,L152E
+        JR      L156D
+l1553:  CALL    FLPWR
+        JR      NZ,L152E
+        JR      L156D
+l155a:  CP      00H
+        LD      A,(IY+U_SCNT)
+        JR      NZ,L1568
+        CALL    HDRD
+        JR      NZ,L152E
+        JR      L156D
+l1568:  CALL    HDWR
+        JR      NZ,L152E
+l156d:  PUSH    AF
+        PUSH    BC
+        PUSH    DE
+        PUSH    HL
+        LD      (IY+U_OPER),01H
+        LD      DE,(L15E0)
+        LD      HL,(L15DE)
+        LD      A,(L15D9)
+        CALL    L16EC
+        POP     HL
+        POP     DE
+        POP     BC
+        POP     AF
+        JP      L152E
+l1589:  CP      02H
+        JR      NZ,L15A1
+        LD      A,(IY+U_DRIVE)
+        CP      07H
+        JR      Z,L15C1
+        JR      L15A1
+l1596:  LD      BC,(L15DA)
+        LD      DE,(L15DC)
+        LD      HL,(L15DE)
+l15a1:  LD      A,(IY+U_DRIVE)
+        CP      02H
+        LD      A,(IY+U_OPER)
+        JR      NC,L15B6
+        CP      01H
+        LD      A,(IY+U_SCNT)
+        JP      Z,FLPWR                 ; Floppy Write
+        JP      FLPRD                   ; Floppy Read
+l15b6:  CP      01H
+        LD      A,(IY+U_SCNT)
+        JP      Z,HDWR                  ; HDWR
+        JP      HDRD                    ; HDRD
+l15c1:  PUSH    DE
+        PUSH    BC
+        LD      A,B
+        RRCA
+        OR      C
+        LD      D,E
+        LD      E,A
+        LD      A,(IY+U_SCNT)
+        CALL    L16E9
+        POP     BC
+        LD      A,(IY+U_SCNT)
+        ADD     A,C
+        LD      C,A
+        POP     DE
+        XOR     A
+        JP      L152E
+
+L15D9:  DS      1
+L15DA:  DS      2
+L15DC:  DS      2
+L15DE:  DS      2
+L15E0:  DS      2
+        DS      2
+L15E4:  DS      1
+        DS      1
+L15E6:  DS      1
+L15E7:  DS      2
+L15E9:  DS      1
+L15EA:  DS      255
+
+l16e9:  NOP
+        NOP
+        NOP
+l16ec:  PUSH    AF
+        LD      (L18CE),HL
+        LD      HL,(048AH)
+        INC     HL
+        INC     HL
+        LD      A,(HL)
+        AND     0FH
+        LD      (L18D5),A
+        CALL    L17F0
+        POP     BC
+        JP      C,L17CB
+        LD      A,(L18D3)
+        SUB     B
+        LD      C,A
+        LD      A,00H
+        JR      NC,L1711
+        LD      A,C
+        ADD     A,B
+        LD      C,A
+        LD      A,B
+        SUB     C
+        LD      B,C
+l1711:  PUSH    AF
+        PUSH    BC
+        PUSH    DE
+        LD      BC,0440H
+l1717:  PUSH    BC
+        LD      B,00H
+        CALL    L17CC
+        JR      C,L179B
+        LD      DE,L18D6
+        BIT     0,(IY+U_OPER)
+        JR      Z,L1732
+        LD      HL,(L18CE)
+        LDIR
+        LD      (L18CE),HL
+        JR      L1746
+l1732:  LD      HL,(L18D0)
+        DI
+        LD      A,(L18D2)
+        OUT     (38H),A
+        LDIR
+        LD      A,(L18D5)
+        OUT     (38H),A
+        EI
+        LD      (L18D0),HL
+l1746:  LD      BC,64
+        LD      HL,L18D6
+        BIT     0,(IY+U_OPER)
+        JR      Z,L176A
+        LD      DE,(L18D0)
+        LD      A,(L18D2)
+        DI
+        OUT     (38H),A
+        LDIR
+        LD      A,(L18D5)
+        OUT     (38H),A
+        EI
+        LD      (L18D0),DE
+        JR      L1774
+l176a:  LD      DE,(L18CE)
+        LDIR
+        LD      (L18CE),DE
+l1774:  POP     BC
+        DJNZ    L1717
+l1777:  BIT     0,(IY+U_OPER)
+        JR      Z,L1789
+        POP     HL
+        PUSH    HL
+        CALL    L1876
+        XOR     A
+        SCF
+l1784:  RLA
+        DJNZ    L1784
+        OR      (HL)
+        LD      (HL),A
+l1789:  POP     DE
+        INC     DE
+        POP     BC
+        POP     AF
+        DJNZ    L1711
+        LD      HL,(L18CE)
+        OR      A
+        JP      NZ,L16E9
+        JR      L17CB
+l1798:  PUSH    BC
+        LD      B,00H
+l179b:  LD      HL,(L18CE)
+        LD      DE,(L18D0)
+        LD      A,(L18D2)
+        BIT     0,(IY+U_OPER)
+        JR      NZ,L17B4
+        EX      DE,HL
+        DI
+        OUT     (38H),A
+        LDIR
+        EX      DE,HL
+        JR      L17B9
+l17b4:  DI
+        OUT     (38H),A
+        LDIR
+l17b9:  LD      A,(L18D5)
+        OUT     (38H),A
+        EI
+        LD      (L18CE),HL
+        LD      (L18D0),DE
+        POP     BC
+        DJNZ    L1798
+        JR      L1777
+l17cb:  RET
+
+l17cc:  LD      HL,(L18CE)
+        LD      DE,(L18CC)
+        OR      A
+        SBC     HL,DE
+        JR      NC,L17EC
+        OR      A
+        INC     H
+        JR      Z,L17EC
+        LD      A,(L18D2)
+        CP      0AH
+        JR      C,L17EC
+        LD      HL,(L18CE)
+        INC     H
+        LD      DE,4000H
+        SBC     HL,DE
+l17ec:  RET
+
+        NOP
+        NOP
+        NOP
+l17f0:  PUSH    DE
+        LD      B,10H
+        INC     DE
+        LD      HL,L188A
+l17f7:  PUSH    BC
+        LD      C,(HL)
+        INC     HL
+        LD      B,(HL)
+        INC     HL
+        PUSH    HL
+        LD      H,B
+        LD      L,C
+        OR      A
+        SBC     HL,DE
+        JR      NC,L180D
+        POP     HL
+        POP     BC
+        DJNZ    L17F7
+        LD      A,05H
+        SCF
+        JR      L183D
+l180d:  INC     HL
+        LD      (L18D3),HL
+        POP     HL
+        POP     BC
+        LD      A,0FH
+        SUB     B
+        LD      (L18D2),A
+        DEC     DE
+        DEC     HL
+        DEC     HL
+        DEC     HL
+        PUSH    HL
+        LD      B,(HL)
+        DEC     HL
+        LD      L,(HL)
+        LD      H,B
+        EX      DE,HL
+        SBC     HL,DE
+        LD      B,L
+        LD      C,00H
+        POP     HL
+        PUSH    BC
+        LD      BC,0022H
+        ADD     HL,BC
+        LD      B,(HL)
+        DEC     HL
+        LD      C,(HL)
+        POP     HL
+        ADD     HL,BC
+        LD      A,05H
+        JR      C,L183D
+        LD      A,(L18D2)
+        LD      (L18D0),HL
+l183d:  POP     DE
+        RET
+
+l183f:  LD      L,(IY+0AH)
+        LD      H,00H
+        RST     08H
+        DAA
+        LD      E,B
+        LD      D,00H
+        LD      B,D
+        ADD     HL,DE
+        LD      E,(IY+0DH)
+        RST     08H
+        DAA
+        ADD     HL,BC
+        INC     HL
+        LD      A,(IY+0DH)
+        CP      1AH
+        JR      NZ,L1874
+        ADD     A,A
+        BIT     0,(IY+0AH)
+        JR      Z,L1861
+l1860:  RRA
+l1861:  DEC     H
+        INC     H
+        JR      NZ,L186D
+        CP      L
+        JR      C,L186D
+        CP      34H
+        JR      Z,L1860
+        XOR     A
+l186d:  OR      A
+        RRA
+        LD      B,00H
+        LD      C,A
+        SBC     HL,BC
+l1874:  DEC     HL
+        RET
+
+l1876:  LD      A,L
+        AND     07H
+        LD      B,A
+        INC     B
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,HL
+        ADD     HL,HL
+        LD      L,H
+        LD      H,00H
+        PUSH    DE
+        LD      DE,L15E9
+        ADD     HL,DE
+        POP     DE
+        RET
+L188A:  DS      64
+        DS      2
+L18CC:  DS      2
+L18CE:  DS      2
+L18D0:  DS      2
+L18D2:  DS      1
+L18D3:  DS      1
+        DS      1
+L18D5:  DS      1
+L18D6:  DS      64
+
+        COPY    IBC
+        COPY    UCBDEFS
+
+        END

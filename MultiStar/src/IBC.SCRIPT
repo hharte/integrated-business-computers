@@ -1,0 +1,50 @@
+.size 6,132,1,60
+.setvar 97 &IBC 5&
+.setvar 98 &IBC/Integrated Business Computers&
+.setvar 99 &05&
+.title Integrated Business Computers
+.position 16
+.center &IBC/Integrated Business Computers&
+.center &DOCUMENTATION&
+.contents
+.heading @97 @98 @,@,&Implementation& @99
+.footing @,@,&@d&
+.special @^\%~&`. 
+.copy IBCCHANGE
+.copy IBCCONTAC
+.copy IBCCONFIG
+.copy IBCBOARD
+.copy IBCSOFT
+.chapter + Link, Copy, Macro and Devname Files
+.eject
+.section .+ Link Files
+.eject
+.section .+ Copy Files
+.eject
+.section .+ Macro Files
+.eject
+.section .+ Devnames File
+.eject
+.chapter + Nucleus Routines
+.chapter + Disk Drivers, Formatters and Bootstraps
+.eject
+.section .+ Disk Drivers
+.eject
+.section .+ Formaters
+.eject
+.section .+ Bootstraps
+.eject
+.chapter + Tape Drivers and Bootstraps
+.eject
+.section .+ Tape Drivers
+.eject
+.section .+ Tape Bootstraps
+.eject
+.chapter + Serial and Parallel Drivers
+.eject 
+.section .+ Serial Drivers
+.eject
+.section .+ Parallel Drivers
+.chapter + class code files
+.chapter + Console Drivers
+.chapter + Disks and Link Maps

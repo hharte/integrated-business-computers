@@ -1,0 +1,256 @@
+;;*********************************************************************
+;;
+;;          O  A  S  I  S
+;;
+;;   Disassembly of the IBC MultiStar 6850 SIO driver for OASIS 5.6.
+;;
+;;*********************************************************************
+        MACRO
+&LABEL: IBC6850      &IOPORT,&VECTOR
+
+        JP      ST                      ; get status
+        JP      IN
+        JP      OUT
+        JP      INIT
+        JP      UNINIT
+
+        SUBT    'Status Routine'
+ST:     SC      79                      ; SNU
+        CALL    STATUS
+        RET     
+
+STATUS: LD      A,(RXBCNT)
+        OR      A
+        PUSH    AF
+        IN      A,(&IOPORT)
+        BIT     1,A
+        JR      Z,STAT3
+        LD      A,(IY+U_BUSY)
+        BIT     2,A
+        JR      Z,STAT2
+        POP     AF
+        PUSH    AF
+        JR      Z,STAT1
+        POP     AF
+        CALL    INCH
+        AND     7FH
+        CP      06H
+        JR      NZ,STATUS
+        LD      (IY+U_WORK0),00H
+        JR      STATUS
+STAT1:  LD      A,(IY+U_WORK0)
+        CP      80H
+        JR      NZ,STAT2
+        JR      STAT3
+        LD      A,(IY+U_WORK0)
+        OR      A
+        JR      NZ,STAT3
+        JR      STAT2
+STAT2:  POP     AF
+        SCF     
+        RET     
+
+STAT3:  POP     AF
+        RET     
+
+        SUBT    'Input Routine'
+IN:     CALL    STATUS
+        JR      NZ,INCH
+        SC      107                     ; Deactivate until interrupt.
+        JR      IN
+INCH:   PUSH    HL
+        LD      HL,RXBUF
+        SC      71                      ; BUFI
+        POP     HL
+        PUSH    AF
+        PUSH    BC
+        LD      A,(IY+U_BUSY)           ; UCB Busy flags
+        BIT     1,A                     ; XON/XOFF enabled?
+        JR      Z,INDONE                ; No, we're done.
+        LD      A,(RXBCNT)              ; Check RX Buffer count
+        CP      0DH                     ; Send XOFF if buffer has 13 characters
+        JR      NZ,INDONE               ; No, we're done.
+        LD      C,DC1                   ; XON
+CHKTDRE:
+        IN      A,(&IOPORT)
+        BIT     1,A                     ; TDRE?
+        JR      NZ,SNDXOFF              ; Yes, send XOFF
+        SC      79                      ; SNU
+        JR      CHKTDRE
+SNDXOFF:
+        LD      A,C
+        OUT     (&IOPORT+1),A           ; Send XON
+        LD      (IY+U_WORK1),00H
+INDONE: POP     BC
+        POP     AF
+        RET     
+
+        SUBT    'Output Routine'
+OUT:    CALL    STATUS
+        JR      C,OUT1
+        SC      79                      ; SNU (Non-interrupt output)
+        JR      OUT
+OUT1:   BIT     2,(IY+U_BUSY)           ; Output Busy Bits
+        JR      NZ,OUT2
+        BIT     1,(IY+U_BUSY)
+        JR      Z,OUT3
+        LD      A,(IY+U_WORK0)          ; Work area
+        OR      A
+        JR      Z,OUT3
+        SC      79                      ; SNU
+        JR      OUT1
+OUT2:   INC     (IY+U_WORK0)            ; Work area
+        LD      A,(IY+U_WORK0)          ; Work area
+        CP      80H
+        JR      NZ,OUT3
+        LD      A,03H
+        OUT     (&IOPORT+1),A
+        JR      OUT
+OUT3:   LD      A,C
+        OUT     (&IOPORT+1),A
+        RET     
+
+        SUBT    'Init Routine'
+INIT:   LD      (UCB),IY                ; Save UCB address
+        LD      A,&VECTOR
+        LD      DE,INTI                 ; input interrupt
+        SC      103                     ; put vect
+        LD      A,03H                   ; Reset device
+        OUT     (&IOPORT),A
+        LD      A,95H                   ; Interrupts, No parity, 8-bit data, 1 stop bit, /16 divisor
+        BIT     7,(IY+U_CONF)           ; Parity enable
+        JR      Z,SETCR
+        BIT     5,(IY+U_CONF)           ; 8-bit data
+        JR      NZ,DATA8B
+        RES     4,A                     ; Set 7-bit data
+DATA8B: BIT     6,(IY+U_CONF)           ; Odd parity
+        JR      Z,SETCR
+        RES     2,A                     ; Set Even parity
+SETCR:  OUT     (&IOPORT),A             ; Write SIO CR
+
+NOBAUD: XOR     A                       ; Clear UCB Work Area
+        LD      (IY+U_WORK0),A
+        LD      (IY+U_WORK1),A
+        RET     
+
+        SUBT    'Uninit Routine'
+UNINIT: PUSH    BC
+        BIT     0,(IY+U_BUSY)
+        JR      Z,NOBREAK               ; No DTR control
+        LD      A,60H                   ; Send a break
+        OUT     (&IOPORT),A
+
+        LD      B,10                    ; Wait 2.56 seconds (10*256ms)
+UNDLY:  LD      A,255
+        SC      19                      ; MSEC
+        DJNZ    UNDLY
+NOBREAK:
+        LD      A,03H
+        OUT     (&IOPORT),A
+        LD      A,&VECTOR
+        LD      DE,0000H
+        SC      103                     ; PUTVECT
+        POP     BC
+        RET     
+
+INTI:
+;
+; service receiver interrupt
+;
+        PUSH    AF
+        PUSH    BC
+        PUSH    HL
+        PUSH    IY
+INTI1:  IN      A,(&IOPORT)             ; SIO Status
+        LD      B,A
+        IN      A,(&IOPORT+1)           ; SIO Data
+        BIT     0,B                     ; RDRF?
+        JP      Z,SIORET                ; No, exit ISR
+        LD      IY,(UCB)
+        BIT     5,(IY+U_CONF)           ; 8-bit data?
+        JR      NZ,INTI2
+        RES     7,A                     ; 7-bit data, mask off high bit
+INTI2:  BIT     6,B                     ; Parity error?
+        JR      NZ,INTI1                ; ... yes, retry.
+        BIT     4,B                     ; Framing error?
+        JR      NZ,INTI1                ; ... yes, retry.
+        SC      102                     ; CHARIN - Perform ESC translation
+        JR      C,INTI1                 ; Ignore character if C set, retry.
+        LD      C,A                     ; Translated character into C.
+        LD      A,(RXBCNT)
+        CP      BUFLEN                  ; Receive Buffer full?
+        JR      NZ,INTI3
+        BIT     7,(IY+U_BAUD)           ; CONIN device?
+        JR      Z,INTI1
+        LD      C,BEL
+        CALL    OUT                     ; Send Bell
+        JR      INTI1                   ; ... and retry.
+INTI3:  BIT     1,(IY+U_BUSY)           ; XON/XOFF?
+        JR      Z,INTI7
+        LD      A,(RXBCNT)
+        CP      BUFLEN-8
+        JR      NZ,INTI4
+        PUSH    BC
+        LD      C,DC3                   ; Send XOFF
+        CALL    OUT
+        POP     BC
+        LD      (IY+U_WORK1),01H
+INTI4:  LD      A,C
+        AND     7FH
+        CP      DC1						; XON?
+        JR      Z,INTI6
+        CP      DC3						; XOFF?
+        JR      NZ,INTI7
+INTI5:  LD      (IY+U_WORK0),A
+        JP      INTI1
+INTI6:  XOR     A
+        JR      INTI5
+INTI7:  LD      A,C
+        PUSH    AF
+        LD      A,(RXBCNT)
+        INC     A
+        LD      (RXBCNT),A
+        DEC     A
+        LD      C,A
+        LD      A,(RXBIDX)
+        ADD     A,C
+INTI8:  SUB     BUFLEN
+        JR      NC,INTI8
+        ADD     A,BUFLEN
+        LD      C,A
+        LD      B,00H
+        LD      HL,RXBUFS
+        ADD     HL,BC
+        POP     AF
+        LD      (HL),A                  ; Store character in RXBUF
+        JP      INTI1                   ; ... and try to get another.
+
+SIORET: POP     IY
+        POP     HL
+        POP     BC
+        POP     AF
+
+        EI      
+        RET     
+
+BUFLEN  EQU     64              ; Receive buffer length
+
+; Receive Buffer (FIFO)
+RXBUF:  DC      BUFLEN          ; Buffer length
+RXBCNT: DC      0               ; Currently used
+RXBIDX: DC      0               ; Current byte (Index)
+RXBUFS: DS      BUFLEN          ; Buffer storage
+
+UCB:    DS      2
+
+U_BAUD  EQU     05H             ; UCB Baud Rate
+U_CONF  EQU     08H             ; UCB word length, parity configuration
+U_BUSY  EQU     1CH             ; UCB Input/Output Busy Flags
+U_WORK0 EQU     1DH             ; UCB Work area low byte
+U_WORK1 EQU     1EH             ; UCB Work area high byte
+
+BEL     EQU     07H             ; Bell (^G)
+DC1     EQU     11H             ; XON (^Q)
+DC3     EQU     13H             ; XON (^S)
+
+        ENDM

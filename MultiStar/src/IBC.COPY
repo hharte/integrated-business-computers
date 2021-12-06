@@ -1,0 +1,49 @@
+;
+; IBC Super Cadet equates
+;
+; IBC Timer (MultiStar)
+TIMER       EQU     014H                ; MultiStar Timer Tick
+;
+; IBC Floppy Controller equates
+;
+FDCSTAT     EQU     024H                ; WD1795 FDC Status Register (Read)
+FDCCMD      EQU     024H                ; WD1795 FDC Command Register (Write)
+FDCTRK      EQU     025H                ; WD1795 FDC Track Register
+FDCSEC      EQU     026H                ; WD1795 FDC Sector Register
+FDCDATA     EQU     027H                ; WD1795 FDC Data Register
+FDCFIFO     EQU     028H                ; IBC MCC Floppy Data FIFO
+;
+; IBC SMD Hard Disk Controller equates
+;
+SMDERR      EQU     040H                ; IBC SMD Error Register (Read)
+SMDARG0     EQU     040H                ; IBC SMD Argument 0 Register (Write)
+SMDARG1     EQU     041H                ; IBC SMD Argument 1 Register
+SMDCMD      EQU     042H                ; IBC SMD Command Register
+SMDSEC      EQU     043H                ; IBC SMD Sector Register
+SMDDATA     EQU     044H                ; IBC SMD Data FIFO
+SMDSTAT     EQU     047H                ; IBC SMD Status Register (Read)
+SMDSCID     EQU     047H                ; IBC SMD Sector ID (Write)
+;
+; Memory board equates
+;
+MEMSEL:     EQU     038H
+;
+; MultiStar MM58174A RTC
+;
+RTC_TSEC    EQU     71H                 ; RTC tenths of seconds
+RTC_SECS    EQU     72H                 ; RTC Units of seconds
+RTC_DAYS    EQU     78H                 ; RTC Units of days
+RTC_YEARS   EQU     7DH                 ; RTC Years (write only)
+RTC_START   EQU     7EH                 ; RTC Start / Stop
+RTC_INTR    EQU     7FH                 ; RTC Interrupt (R/W)
+;
+; global equates
+;
+NUCCLK1     EQU     3
+NUCCLK2     EQU     4
+NUCMON      EQU     13H
+NUCDAY      EQU     14H
+NUCYEAR     EQU     15H
+NUCHOUR     EQU     1BH
+NUCMIN      EQU     1CH
+NUCSEC      EQU     1DH

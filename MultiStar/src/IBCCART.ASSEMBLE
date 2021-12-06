@@ -1,0 +1,660 @@
+          TITLE    'IBC MultiStar Cartridge Tape Driver'
+;*********************************************************************
+;
+;          O  A  S  I  S
+;
+;   Phase One Systems, Incorporated
+;   7700 Edgewater Drive, #830
+;   Oakland, California 94621
+;
+;   (415) 562-8085
+;
+;   Copyright 1980, 1981, 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system or trans-
+;   mitted, in any form or by any means, electronic,
+;   mechanical, photocopying, recording, or otherwise,
+;   without the prior written permission of Phase One
+;   Systems.
+;
+;*********************************************************************
+; Disassembly of SYSTEM.DEV25_R_256
+IBCDEV25:       REL
+FAKESEL:
+        XOR     A           ; set nc,z
+        RET                 ; return
+        NOP                 ; filler
+        JP      FAKESEL
+        JP      FAKESEL
+        JP      FAKESEL
+        JP      FAKESEL
+
+TAPEDRV:
+;
+; enter with a = cmd code
+;
+; 80 = select drive and track
+; 81 = rewind
+; 82 = read
+; 83 = write
+; 84 = back space record
+; 85 = forward space record
+; 86 = write gap (erase)
+; 87 = write tape mark
+; 88 = stop the tape
+; 89 = return tape status
+;
+; return codes:
+; 00 Z   success
+; 01 NZ  not ready
+; 02 NZ  write protected
+; 03 NZ  tape mark
+; 04 NZ  crc error
+; 05 NZ  end of tape
+; 06 NZ  begin of tape
+; 07 NZ  data late
+;
+;************************************************
+        RST     38H
+        CP      80H         ; min
+        RET     C           ; return no good
+        CP      89H+1       ; max
+        CCF                 ; invert
+        RET     C           ; return no good
+;
+; dispatch to proper routine
+;
+        SUB     80H         ; strip off msb
+        PUSH    HL          ; save hl
+        PUSH    DE          ; and de
+        ADD     A,A         ; times two
+        LD      E,A         ; to de
+        LD      D,00H
+        LD      HL,DISPTAB  ; point table
+        ADD     HL,DE       ; sum
+        LD      E,(HL)      ; load address
+        INC     HL
+        LD      D,(HL)      ; msb
+        EX      DE,HL       ; to hl
+        POP     DE          ; restore de
+        EX      (SP),HL     ; get hl
+        RET                 ; jump indirect
+;
+; dispatch table
+;
+DISPTAB:
+        DC      (SEL)       ; Select
+        DC      (REW)       ; Rewind
+        DC      (RDB)       ; Read Block
+        DC      (WRB)       ; Write Block
+        DC      (BSR)       ; Backspace Record
+        DC      (FSR)       ; Forward Space Record
+        DC      (GAP)       ; Write Gap
+        DC      (WTM)       ; Write Tape Mark
+        DC      (STOP)      ; Stop Tape
+        DC      (GETST)     ; Get Status
+
+        SUBT 'Rewind routine'
+REW:
+;
+; rewind tape to loadpoint
+;
+; possible errors:
+; 00 success
+; 01 not ready
+;
+        LD      DE,0        ; Unit 0, track 0
+
+        SUBT 'Select unit, track'
+SEL:
+;
+; on entry:
+;  D = unit (0 - 3)
+;  E = track (0 - 3)
+;
+        LD      A,D
+        AND     03H
+        JR      NZ,L0050                ; (+0ah)
+        LD      A,E
+        AND     03H
+        JR      NZ,L0050                ; (+05h)
+        CALL    L0338
+        JR      L0053                   ; (+03h)
+l0050:  LD      A,01H
+        OR      A
+l0053:  LD      HL,L037E
+        LD      (HL),00H
+        RET
+
+        SUBT 'Backspace record'
+BSR:                            ; l0059
+;
+; backspace one record
+;
+        CALL    L0214
+        JR      NZ,L006D                ; (+0fh)
+        LD      A,B
+        AND     80H
+        LD      A,06H
+        JR      NZ,L006D                ; (+08h)
+        LD      B,09H
+        LD      HL,0002H
+        CALL    L025C
+l006d:  RET
+
+        SUBT 'Forward space record'
+FSR:                            ; L006E
+;
+; forward space one record
+;
+        CALL    L0214
+        JR      NZ,L0083                ; (+10h)
+        LD      A,B
+        AND     40H
+        CALL    NZ,L0324
+        JR      NZ,L0083                ; (+08h)
+        LD      B,08H
+        LD      HL,0002H
+        CALL    L025C
+l0083:  RET
+
+        SUBT 'Write gap'
+GAP:                            ; L0084
+;
+; Write gap
+;
+        LD      A,01H
+        LD      (L037E),A
+        XOR     A
+        RET
+
+        SUBT 'Write tape mark'
+WTM:
+;
+; Write tape mark
+;
+        CALL    L0214
+        JR      NZ,L00A3                ; (+13h)
+        LD      B,0FH
+        LD      A,(L037E)
+        OR      A
+        JR      Z,L009D                 ; (+05h)
+        INC     B
+        XOR     A
+        LD      (L037E),A
+l009d:  LD      HL,0002H
+        CALL    L025C
+l00a3:  RET
+
+        SUBT 'Stop tape'
+STOP:
+;
+; Stop tape
+;
+        CALL    L0214
+        RET
+
+        SUBT 'Get tape status'
+GETST:
+;
+; return coded status in A:
+;
+; bit    meaning if high
+;  7     selected
+;  6     ready
+;  5     BOT
+;  4     EOT
+;  3     write protected
+;  2     busy
+;  1&0   max number of tracks (base zero)
+;
+;  D     has last unit selected
+;  E     has last track selected
+;
+        CALL    L0214
+        JR      NZ,L00D5                ; (+28h)
+        LD      A,B
+        AND     03H
+        LD      DE,0
+        CP      03H
+        JR      Z,L00BB                 ; (+04h)
+        LD      A,B
+        AND     0BFH
+        LD      B,A
+l00bb:  LD      H,80H
+        LD      A,B
+        AND     0C0H
+        RRC     A
+        RRC     A
+        OR      H
+        LD      H,A
+        LD      A,B
+        AND     10H
+        RRC     A
+        OR      H
+        LD      H,A
+        LD      A,C
+        AND     80H
+        XOR     80H
+        RRC     A
+        OR      H
+l00d5:  RET
+
+        SUBT 'Read block routine'
+;
+; on entry:
+; DE = block length >= 80
+; HL = buffer location
+;
+; possible errors:
+;  00 success
+;  01 not ready or not select
+;  03 tape mark
+;  04 crc
+;  05 eot (not an error)
+;  07 late
+;
+RDB:                            ; l00d6
+        LD      (L0391),DE
+        LD      (L0393),HL
+        CALL    L0214
+        JP      NZ,L0164
+        LD      A,B
+        AND     40H
+        CALL    NZ,L0324
+        JR      NZ,L0164                ; (+79h)
+        PUSH    DE
+        PUSH    HL
+        LD      B,0CH
+        LD      HL,0002H
+        CALL    L0287
+        POP     HL
+        POP     DE
+        LD      B,E
+        LD      C,61H
+        JR      NZ,L0164                ; (+68h)
+        LD      A,E
+        OR      A
+        JR      Z,L0101                 ; (+01h)
+        INC     D
+l0101:  DI
+        LD      A,03H
+        OUT     (62H),A
+l0106:  IN      A,(62H)
+        AND     40H
+        JR      Z,L0129                 ; (+1dh)
+        PUSH    BC
+        PUSH    DE
+        PUSH    HL
+        LD      DE,L0389
+        SC      37              ; GETTIME
+        LD      BC,0008H
+        LD      DE,L0389
+        LD      HL,L0381
+        SC      93              ; COMPARE String BC=len, DE=S1, HL=S2
+        POP     HL
+        POP     DE
+        POP     BC
+        JR      C,L0106                 ; (-1eh)
+        LD      A,05H
+        OR      A
+        JR      L0164                   ; (+3bh)
+l0129:  IN      A,(62H)
+        AND     01H
+        JR      NZ,L0137                ; (+08h)
+        IN      A,(62H)
+        AND     20H
+        JR      NZ,L0129                ; (-0ch)
+        JR      L013E                   ; (+07h)
+l0137:  INI
+        JR      NZ,L0129                ; (-12h)
+        DEC     D
+        JR      NZ,L0129                ; (-15h)
+l013e:  XOR     A
+        OUT     (62H),A
+        EI
+        CALL    L02DE
+        JR      NZ,L0164                ; (+1dh)
+        PUSH    BC
+        LD      A,B
+        AND     40H
+        LD      B,A
+        LD      A,C
+        AND     08H
+        OR      B
+        CP      48H
+        JR      Z,L0166                 ; (+12h)
+        POP     BC
+        LD      A,B
+        AND     20H
+        LD      A,03H
+        JR      NZ,L0164                ; (+08h)
+        LD      A,C
+        AND     07H
+        LD      A,04H
+        JR      NZ,L0164                ; (+01h)
+        XOR     A
+l0164:  OR      A
+        RET
+
+l0166:  POP     BC
+        CALL    L0324
+        LD      DE,(L0391)
+        LD      HL,(L0393)
+        JP      RDB
+
+        SUBT 'Write block routine'
+;
+; on entry:
+; DE = block length (min 80)
+; HL = buff address
+;
+; possible errors:
+;  00 success
+;  01 not ready
+;  02 write protect
+;  04 crc error
+;  05 eot (warning)
+;  07 late
+;
+WRB:                            ; l0174
+        CALL    L0214
+        JR      NZ,L01E7                ; (+6eh)
+        LD      (L0391),DE
+        LD      (L0393),HL
+        LD      A,B
+        AND     10H
+        LD      A,02H
+        JR      NZ,L01E7                ; (+60h)
+        PUSH    HL
+        PUSH    DE
+        LD      B,0DH
+        LD      A,(L037E)
+        OR      A
+        JR      Z,L019A                 ; (+09h)
+        LD      B,0EH
+        LD      HL,0200H
+        XOR     A
+        LD      (L037E),A
+l019a:  CALL    L0287
+        POP     DE
+        LD      B,E
+        LD      C,61H
+        JR      NZ,L01E7                ; (+44h)
+        LD      A,E
+        OR      A
+        JR      Z,L01A8                 ; (+01h)
+        INC     D
+l01a8:  DI
+        LD      A,02H
+        OUT     (62H),A
+l01ad:  POP     HL
+        OUTI
+        JR      NZ,L01B5                ; (+03h)
+        DEC     D
+        JR      Z,L01C5                 ; (+10h)
+l01b5:  PUSH    HL
+        LD      HL,0FFFFH
+l01b9:  IN      A,(62H)
+        AND     02H
+        JR      NZ,L01AD                ; (-12h)
+        DEC     HL
+        LD      A,H
+        OR      L
+        JR      NZ,L01B9                ; (-0bh)
+        POP     HL
+l01c5:  IN      A,(62H)
+        AND     02H
+        JR      Z,L01C5                 ; (-06h)
+        XOR     A
+        OUT     (62H),A
+        EI
+l01cf:  IN      A,(62H)
+        AND     60H
+        JR      NZ,L01CF                ; (-06h)
+        CALL    L02DE
+        JR      NZ,L01E7                ; (+0dh)
+        LD      A,B
+        AND     40H
+        JR      NZ,L01E8                ; (+09h)
+        LD      A,C
+        AND     07H
+        LD      A,04H
+        JR      NZ,L01E7                ; (+01h)
+        XOR     A
+l01e7:  RET
+
+l01e8:  LD      A,C
+        AND     07H
+        JR      NZ,L01F2                ; (+05h)
+        CALL    L0324
+        JR      L01E7                   ; (-0bh)
+l01f2:  LD      A,B
+        AND     03H
+        CP      03H
+        LD      A,04H
+        JR      Z,L01E7                 ; (-14h)
+        PUSH    BC
+        CALL    BSR
+        LD      A,01H
+        SC      19              ; MSEC - delay 1ms.
+        CALL    L0370
+        POP     BC
+        CALL    L0324
+        LD      DE,(L0391)
+        LD      HL,(L0393)
+        JP      WRB
+
+l0214:  IN      A,(62H)
+        BIT     4,A
+        JR      NZ,L0258                ; (+3eh)
+        XOR     02H
+        AND     62H
+        JR      Z,L0232                 ; (+12h)
+        XOR     A
+        OUT     (62H),A
+        DEC     A
+        OUT     (60H),A
+l0226:  IN      A,(62H)
+        AND     20H
+        JR      NZ,L0226                ; (-06h)
+        IN      A,(61H)
+        LD      B,07H
+l0230:  DJNZ    L0230                   ; (-02h)
+l0232:  LD      A,08H
+        OUT     (62H),A
+        CALL    L02DE
+        JR      NZ,L025A                ; (+1fh)
+        LD      A,C
+        XOR     20H
+        AND     0A0H
+        CP      0A0H
+        JR      NZ,L0253                ; (+0fh)
+        LD      B,04H
+        LD      HL,0300H
+        CALL    L025C
+        JR      NZ,L025A                ; (+0ch)
+        CALL    L02DE
+        JR      NZ,L025A                ; (+07h)
+l0253:  LD      A,C
+        AND     0F0H
+        JR      Z,L025A                 ; (+02h)
+l0258:  LD      A,01H
+l025a:  OR      A
+        RET
+
+l025c:  PUSH    DE
+        CALL    L0287
+        JR      NZ,L0284                ; (+22h)
+l0262:  IN      A,(62H)
+        AND     20H
+        LD      A,00H
+        JR      Z,L0284                 ; (+1ah)
+        PUSH    BC
+        PUSH    DE
+        PUSH    HL
+        LD      DE,L0389
+        SC      37              ; GETTIME
+        LD      BC,0008H
+        LD      DE,L0389
+        LD      HL,L0381
+        SC      93              ; COMPARE String BC=len, DE=S1, HL=S2
+        POP     HL
+        POP     DE
+        POP     BC
+        JR      C,L0262                 ; (-20h)
+        LD      A,01H
+l0284:  OR      A
+        POP     DE
+        RET
+
+l0287:  PUSH    DE
+        LD      DE,L0381
+        SC      37              ; GETTIME
+        LD      (L037F),HL
+        LD      H,00H
+        LD      DE,(L0387)
+        ADD     HL,DE
+        CALL    L030E
+        LD      (L0387),HL
+        LD      HL,(L037F)
+        LD      L,00H
+        ADD     HL,DE
+        LD      DE,(L0384)
+        ADD     HL,DE
+        CALL    L030E
+        LD      (L0384),HL
+        LD      HL,(L0381)
+        ADD     HL,DE
+        CALL    L030E
+        LD      (L0381),HL
+        LD      DE,3432H
+        OR      A
+        SBC     HL,DE
+        JR      NZ,L02C6                ; (+06h)
+        LD      HL,3030H
+        LD      (L0381),HL
+l02c6:  XOR     A
+        OUT     (62H),A
+        LD      A,B
+        OUT     (60H),A
+l02cc:  IN      A,(62H)
+        LD      B,A
+        AND     02H
+        JR      Z,L02CC                 ; (-07h)
+        LD      A,B
+        AND     20H
+        LD      A,01H
+        JR      Z,L02DB                 ; (+01h)
+        XOR     A
+l02db:  OR      A
+        POP     DE
+        RET
+
+l02de:  PUSH    HL
+        LD      B,02H
+        LD      HL,0002H
+        CALL    L0287
+        JR      NZ,L030C                ; (+23h)
+        LD      B,02H
+l02eb:  LD      C,A
+l02ec:  IN      A,(62H)
+        AND     20H
+        JR      Z,L02EC                 ; (-06h)
+        LD      A,01H
+        OUT     (62H),A
+        IN      A,(60H)
+l02f8:  IN      A,(62H)
+        AND     01H
+        JR      Z,L02F8                 ; (-06h)
+        IN      A,(61H)
+        DJNZ    L02EB                   ; (-17h)
+        LD      B,A
+        IN      A,(62H)
+        AND     04H
+        JR      Z,L030C                 ; (+03h)
+        LD      A,01H
+        OR      A
+l030c:  POP     HL
+        RET
+
+l030e:  LD      DE,0
+        LD      A,3AH
+        CP      H
+        JR      NC,L031A                ; (+04h)
+        INC     L
+        SUB     0AH
+        LD      H,A
+l031a:  LD      A,36H
+        CP      L
+        JR      NC,L0323                ; (+04h)
+        INC     D
+        SUB     06H
+        LD      L,A
+l0323:  RET
+
+l0324:  PUSH    DE
+        PUSH    HL
+        LD      A,B
+        AND     03H
+        LD      E,A
+        CP      03H
+        LD      A,05H
+        JR      Z,L0334                 ; (+04h)
+        INC     E
+        CALL    L0338
+l0334:  OR      A
+        POP     HL
+        POP     DE
+        RET
+
+l0338:  CALL    L0214
+        JR      NZ,L036A                ; (+2dh)
+        LD      B,06H
+        LD      HL,0200H
+        CALL    L0287
+        JR      NZ,L036A                ; (+23h)
+        LD      A,E
+        AND     03H
+        OUT     (60H),A
+l034c:  IN      A,(62H)
+        AND     20H
+        JR      Z,L036A                 ; (+18h)
+        PUSH    BC
+        PUSH    DE
+        PUSH    HL
+        LD      DE,L0389
+        SC      37              ; GETTIME
+        LD      BC,0008H
+        LD      DE,L0389
+        LD      HL,L0381
+        SC      93              ; COMPARE String BC=len, DE=S1, HL=S2
+        POP     HL
+        POP     DE
+        POP     BC
+        JR      C,L034C                 ; (-1eh)
+l036a:  LD      HL,L037E
+        LD      (HL),00H
+        RET
+
+l0370:  CALL    L0214
+        JR      NZ,L037D                ; (+08h)
+        LD      B,07H
+        LD      HL,0200H
+        CALL    L025C
+l037d:  RET
+
+L037E:  DS      1
+L037F:  DS      2
+L0381:  DS      2
+        DS      1
+L0384:  DS      2
+        DS      1
+L0387:  DS      2
+L0389:  DS      8
+L0391:  DS      2
+L0393:  DS      2
+
+        END
+

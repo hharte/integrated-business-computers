@@ -1,0 +1,43 @@
+    TITLE   'IBC Bank Selec Routine'
+;******************************************************************************
+;
+;   Phase One Systems, Inc.
+;   7700 Edgewater Drive, Suite 830
+;   Oakland, California 95621
+;
+;
+;   Copyright 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system, or
+;   transmitted, in any form or by any means--electronic,
+;   mechanical, photocopying, recording, or otherwise--
+;   without the prior written permission of Phase One
+;   Systems, Inc.
+;
+;******************************************************************************
+;
+;******************************************************************************
+;
+;           C H A N G E   R E C O R D
+;
+;   Date   Initials Purpose
+; -------- -------- -----------------------------------------------------------
+; 05/27/82   MJB    Add copyright notice
+;
+;******************************************************************************
+        EJECT
+N$MU:   REL
+
+        ENTRY   BANKSEL     ; bank select routine
+
+;       COPY    N$DEF       ; nucleus definitions
+        COPY    IBC         ; IBC definitions
+
+BANKSEL:
+        CP      16          ; bank 0-15?
+        RET     NC          ; return if not
+        OUT     (MEMSEL),A  ; select bank NEXT
+;       LD      (CURBANK),A ; save bank number
+        RET
+        END

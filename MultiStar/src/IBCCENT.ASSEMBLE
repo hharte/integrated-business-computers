@@ -1,0 +1,63 @@
+          TITLE    'IBC MultiStar Centronics Driver'
+;*********************************************************************
+;
+;          O  A  S  I  S
+;
+;   Phase One Systems, Incorporated
+;   7700 Edgewater Drive, #830
+;   Oakland, California 94621
+;
+;   (415) 562-8085
+;
+;   Copyright 1980, 1981, 1982 by Phase One Systems, Inc.
+;
+;   All rights reserved. No part of this document may be
+;   reproduced, stored in a retrieval system or trans-
+;   mitted, in any form or by any means, electronic,
+;   mechanical, photocopying, recording, or otherwise,
+;   without the prior written permission of Phase One
+;   Systems.
+;
+;*********************************************************************
+DEV28:  REL
+        JP      STATUS			; get status
+        JP      INPUT
+        JP      OUTPUT
+        JP      INIT
+        JP      DEINIT
+
+STATUS: IN      A,(STATO)       ; Get device status byte
+        XOR     61H             ; Test for busy
+        AND     79H
+        SCF                     ; Output ready.
+        JR      Z,.STAT1        ; Return with Z and C set
+        XOR     A               ; Set Z flag - reset C flag
+.STAT1: RET
+
+INPUT:  RET
+
+OUTPUT: CALL    STATUS
+        JR      C,OUTP1
+        SC      79              ; SNU
+        JR      OUTPUT
+OUTP1:  LD      A,C             ; Copy character to A reg
+        OUT     (STRBO),A
+        OUT     (DATAO),A
+        RET
+
+INIT:   LD      (UCB),IY        ; Save UCB (IY) into 0037
+        XOR     A
+        OUT     (RSETO),A
+        RET
+
+DEINIT: RET
+
+UCB:    LD      BC,0000H
+
+STATO   EQU     0ECH
+DATAO   EQU     0ECH
+STRBO   EQU     0EDH            ; Strobe?
+RSETO   EQU     0EEH            ; Reset port?
+
+        END
+
