@@ -20,10 +20,12 @@ set m2sio1 en
 set m2sio0 iobase=00
 set m2sio0 debug
 d m2vec0 6
+d m2dbval0 0C
 d m2inten0 1
 set m2sio1 iobase=02
 set m2sio1 baud=9600
 d m2vec1 7
+d m2dbval1 0E
 d m2inten1 1
 attach m2sio1 connect=com11
 set m2sio1 dcd
