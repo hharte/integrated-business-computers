@@ -1050,9 +1050,9 @@ The [z80_ssd project](https://github.com/hharte/z80_ssd) replaces the on-board S
 
 ## Running in the SIMH Simulator
 
-Compile SIMH using the patches in the digitex branch here:
+Compile SIMH using the patches in the ibc_mcc branch here:
 
-[https://github.com/hharte/simh/tree/digitex](https://github.com/hharte/simh/tree/digitex)
+[https://github.com/hharte/simh/tree/ibc_mcc](https://github.com/hharte/simh/tree/ibc_mcc)
 
 Run the AltairZ80 simulator using the ibc_multistar configuration file from this repository:
 
