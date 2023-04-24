@@ -557,7 +557,7 @@ FDUTILS:
         RET
 
         JR      L0395                   ; E192: HOME
-        DW      0                       ; E104: Offset of FDC ISR from beginning of FDUTILS8.
+        DW      FDCISR-FDUTILS+RAMUTL   ; E104: FDC ISR address.
         JR      L03A5                   ; E106:
         JR      FDREAD                  ; E108:
         JP      L06D0                   ; E10A:
