@@ -1050,17 +1050,12 @@ The [z80_ssd project](https://github.com/hharte/z80_ssd) replaces the on-board S
 
 ## Running in the SIMH Simulator
 
-Compile SIMH using the patches in the ibc_mcc branch here:
+The [Open SIMH](https://github.com/open-simh/simh) AltairZ80 simulator includes support for the IBC MultiStar.
 
-[https://github.com/hharte/simh/tree/ibc_mcc](https://github.com/hharte/simh/tree/ibc_mcc)
-
-Run the AltairZ80 simulator using the ibc_multistar configuration file from this repository:
+Run the AltairZ80 simulator using the `ibc_multistar.ini` configuration file from this repository:
 
 
 ```
-./altairz80 ibc_multistar
+./altairz80 ibc_multistar.ini
 ```
-
-
-Press ESC to get to the monitor prompt.  There will be a lot of debug messages scrolling because there is a lot of verbose debugging enabled.
 
