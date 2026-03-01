@@ -1,0 +1,956 @@
+	MACRO
+&LABEL:	AECCART	&BASE
+	TITLE	'Alloy Engineering DS-100 and DZ-80 Cartridge Tape Driver'
+;;*********************************************************************
+;;
+;;          O  A  S  I  S
+;;
+;;   Phase One Systems, Incorporated
+;;   7700 Edgewater Drive, #830
+;;   Oakland, California 94621
+;;
+;;   (415) 562-8085
+;;
+;;   Copyright 1980, 1981, 1982 by Phase One Systems, Inc.
+;;
+;;   All rights reserved. No part of this document may be
+;;   reproduced, stored in a retrieval system or trans-
+;;   mitted, in any form or by any means, electronic,
+;;   mechanical, photocopying, recording, or otherwise,
+;;   without the prior written permission of Phase One
+;;   Systems.
+;;
+;;*********************************************************************
+ 
+	IF	[&BASE.AND.0F0H].NE.&BASE
+	ERR	'Board base address is not on even 16 address boundary'
+	ELSE
+AECBASE:	EQU	&BASE	; base i/o address
+	ENDIF
+ 
+&LABEL:	REL
+ 
+;
+; fake transfer vector
+;
+FAKESEL:	XOR	A	; set nc,z
+	RET		; return
+	NOP		; filler
+FAKEIN:	JP	FAKESEL
+FAKEOUT:	JP	FAKESEL
+	JP	INIT	; initialize tape
+FAKEUNIN:	JP	FAKESEL
+;
+; now the cmd tv
+;
+AECTAPE:
+;
+; enter with a = cmd code
+;
+; 80 = select drive and track
+; 81 = rewind
+; 82 = read
+; 83 = write
+; 84 = back space record
+; 85 = forward space record
+; 86 = write gap (erase)
+; 87 = write tape mark
+; 88 = fast forward to end of tape
+; 89 = return tape status
+;
+; return codes:
+; 00 Z   success
+; 01 NZ  not ready
+; 02 NZ  write protected
+; 03 NZ  tape mark
+; 04 NZ  crc error
+; 05 NZ  end of tape
+; 06 NZ  begin of tape
+; 07 NZ  data late
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; test cmd code
+;
+	CP	89H+1	; command code too big?
+	CCF
+	RET	C	; rif
+	SUB	80H	; too small?
+	RET	C	; rif
+;
+; dispatch to proper routine
+;
+	PUSH	HL	; save hl
+	PUSH	DE	; and de
+	ADD	A	; relative command times two
+	LD	E,A	; to de
+	LD	D,0
+	LD	HL,DISPTAB	; point table
+	ADD	HL,DE	; sum
+	LD	E,(HL)	; load address
+	INC	HL
+	LD	D,(HL)	; msb
+	EX	DE,HL	; to hl
+	POP	DE	; restore de
+	EX	(SP),HL	; get hl
+	RET		; jump indirect
+;
+; dispatch table
+;
+DISPTAB:
+	DC	(SEL)	; select drive and track
+	DC	(REW)	; rewind
+	DC	(RDB)	; read block
+	DC	(WRB)	; write block
+	DC	(BSR)	; backspace record
+	DC	(FSR)	; forwardspace record
+	DC	(GAP)	; write gap
+	DC	(WTM)	; write tape mark
+	DC	(FST)	; fast forward to end of tape
+	DC	(GETST)	; get drive status
+	SUBT	'Initialize DEI ad PCI'
+INIT:
+;
+; init the pci
+;
+	IN	A,(IPCICR)	; reset to mr1 by reading cr
+	LD	A,MSYN1	; set single sync mode
+	OUT	(OPCIMR),A
+	XOR	A	; clear mr2
+	OUT	(OPCIMR),A
+	IN	A,(IPCICR)	; clear to sr1 by reading cr
+	LD	A,PSID	; write first sync byte
+	OUT	(OPCISR),A
+	LD	A,RID	; write second sync byte
+	OUT	(OPCISR),A
+	LD	A,10H	; reset errors and disable
+	OUT	(OPCICR),A	; transmitter and receiver
+;
+; init the DEI
+;
+	LD	A,0FEH	; rev. to clear era f/f
+	OUT	(ODEIL1),A
+	LD	A,0FFH	; idle
+	OUT	(ODEIL1),A
+	CALL	DLY2M	; allow erase head to settle
+	XOR	A	; select invalid drive
+	OUT	(ODEIL2),A
+	RET
+	SUBT	'Select unit, track'
+SEL:
+;
+; on entry:
+;  D = unit (0 - 3)
+;  E = track (0 - 3)
+;
+	LD	(UNITTRK),DE	; save unit and track
+	INC	D	; adjust unit and track
+	INC	E
+	LD	A,E	; get track
+	AND	3	; mask
+	RLCA		; shift left two bits
+	RLCA
+	BIT	2,D	; max unit?
+	JR	Z,MERGE	; brif not
+	LD	D,10H	; else change
+MERGE:
+	OR	D	; merge unit code
+	RLCA		; shift left 3 bits
+	RLCA
+	RLCA
+	CPL		; complement
+	OUT	(ODEIL2),A	; select
+	XOR	A	; no errors
+	RET
+	SUBT	'Rewind routine'
+REW:
+;
+; rewind tape to loadpoint
+;
+; possible errors:
+; 00 success
+; 01 not ready
+;
+;
+; issue rewind
+;
+	LD	A,0FFH	; idle
+	OUT	(ODEIL1),A
+	CALL	DLY2M	; wait 2 msec
+	CALL	CHKRDY	; check ready
+	RET	NZ	; ret if not ready
+	LD	A,0DFH	; rwd*
+	CALL	DCAC	; do it
+	LD	A,0FFH	; drive idle
+	OUT	(ODEIL1),A
+	XOR	A	; set no errors
+	RET
+	SUBT	'Read block'
+RDB:
+;
+; on entry:
+;  DE = block length >= 80
+;  HL = buffer location
+;
+; possible errors:
+;  00 success
+;  01 not ready or not select
+;  03 tape mark
+;  04 crc
+;  05 eot (not an error)
+;  07 late
+;
+;
+; read initialization
+;
+	CALL	RWCOM	; setup
+	RET	NZ	; return if not ready
+	DI		; no interrupts while reading
+	LD	A,0FDH	; fwd*
+	CALL	DCAC	; issue command and check
+	LD	D,0	; init lrcc
+;
+; wait 24 msec before allowing read
+;
+	LD	B,12	; constant for 24 msec
+RDBW24M:
+	CALL	DLY2M
+	DJNZ	RDBW24M
+;
+; init pci to read
+;
+	LD	A,10H	; reset errors
+	OUT	(OPCICR),A
+	LD	A,4	; enable receiver
+	OUT	(OPCICR),A
+;
+; B = 0 here
+;
+	CALL	WDAD	; wait for data detect
+	LD	BC,(LEN)	; get length
+	LD	HL,(MEM)	; get destination
+;
+; test record type
+;
+RDBWRID:
+	IN	A,(IMSR)	; get misc stat
+	RLCA		; Rx$RDY?
+	JP	C,RDBRRID
+	ADD	A	; still have dad?
+	JP	M,RDBWRID	; brif
+	JR	RDBCRCE	; else
+RDBRRID:
+	IN	A,(IPCIDR)	; get byte
+	CP	RID	; data record?
+	JP	Z,RDBWDAT	; brif
+	CP	TMID	; file mark?
+	JR	NZ,RDBCRCE	; brif not
+RDBWEOR:
+	IN	A,(IMSR)	; get misc stat
+	RLCA		; Rx$RDY?
+	JP	C,RDBREOR
+	ADD	A	; still have dad?
+	JP	M,RDBWEOR	; brif
+	JR	RDBCRCE	; else
+RDBREOR:
+	IN	A,(IPCIDR)	; get byte
+	CP	EORID	; end of record?
+	LD	A,3	; tape mark return code
+	JP	Z,RDBDONE	; brif tape mark
+	JR	RDBCRCE	; else
+RDBWDAT:
+;
+; read the block
+;
+	IN	A,(IMSR)	; get status
+	RLCA		; RxRDY?
+	JP	C,RDBRDAT	; brif
+	IN	A,(IPCISR)	; get status
+	ADD	A	; dad*?
+	JP	NZ,RDBWDAT	; brif
+	JR	RDBCRCE	; else
+RDBRDAT:
+	IN	A,(IPCIDR)	; get byte
+	LD	(HL),A	; save it
+	XOR	D	; update lrcc
+	LD	D,A	; save it
+	CPI		; inc HL, dec BC
+	JP	PE,RDBWDAT	; loop until done
+;
+; get lrcc status and save
+;
+RDBWLRC:
+	IN	A,(IMSR)	; get misc stat
+	RLCA		; Rx$RDY?
+	JP	C,RDBRLRC
+	ADD	A	; still have dad?
+	JP	M,RDBWLRC	; brif
+	JR	RDBCRCE	; else
+RDBRLRC:
+	IN	A,(IPCIDR)	; get byte
+	XOR	D	; same as expected?
+	JR	NZ,RDBCRCE	; brif not
+	IN	A,(IPCISR)
+	AND	18H	; vpe or overrun?
+	JR	Z,RDBDONE	; brif not
+RDBCRCE:
+	LD	A,4	; return code
+RDBDONE:
+;
+; stop the tape
+;
+	PUSH	AF	; save return code
+	CALL	RSTP	; read completion
+RWDONE:
+;
+; read/write common completion
+;
+	POP	AF	; restore return code
+	POP	DE	; restore reg
+	POP	BC
+	POP	HL
+	OR	A	; set flags as appropriate
+	EI		; interrupts on
+	RET		; return
+	SUBT	'Write block routine'
+WRB:
+;
+; on entry:
+;  DE = block size (min 80)
+;  HL = buff address
+;
+; possible errors:
+;  00 success
+;  01 not ready
+;  02 write protect
+;  04 crc error
+;  05 eot (warning)
+;  07 late
+;
+	CALL	RWCOM	; setup
+	RET	NZ	; ret if not ready
+	CALL	CHKWPRT	; write protected?
+	JP	NZ,WRBDONE	; brif
+;
+; compute lrcc for record
+;
+;    A = 0 on entry
+;
+	LD	HL,(MEM)	; point to buffer
+	LD	BC,(LEN)	; get length
+WRBALRC:
+	XOR	(HL)	; do a byte
+	CPI		; inc HL, dec BC
+	JP	PE,WRBALRC	; loop until done
+	LD	D,A	; save
+	LD	(LRCC),A
+	LD	A,RID	; set record type
+	LD	(RTYPE),A
+;
+; program pci
+;
+	DI		; no interrupts while writing
+	IN	A,(IPCICR)	; set to mr1 by writing cr
+	LD	A,MSYN2	; set double sync mode
+	OUT	(OPCIMR),A	; and even parity
+;
+; write preamble
+;
+	CALL	WENABLE	; write enable
+	LD	A,0F5H	; wen and fwd
+	CALL	DCAC	; give command and check
+	CALL	WPASTLP	; get past load point
+	CALL	WPRE	; preamble
+	LD	A,RID	; rec id
+	OUT	(OPCIDR),A	; write
+	LD	BC,(LEN)	; get len
+	LD	HL,(MEM)	; get address
+;
+; write body no dad
+;
+WRBNDAD:
+	IN	A,(IMSR)	; get status
+	ADD	A
+	ADD	A
+	JP	M,WRBWDAD	; brif dad now
+	JP	NC,WRBNDAD	; loop for txrdy
+	LD	A,(HL)	; get byte
+	OUT	(OPCIDR),A	; write
+	CPI		; inc HL, dec Bc
+	JP	PE,WRBNDAD	; loop until done
+	JP	WRBPOST
+;
+; write with dad
+;
+WRBWDAD:
+	IN	A,(IPCISR)	; clear pci status
+WRBWDAD1:
+	IN	A,(IMSR)	; get status
+	ADD	A	; to sign
+	JP	P,WRBWDAD1	; loop
+	LD	A,(HL)	; get byte
+	OUT	(OPCIDR),A	; send
+	CPI		; inc HL, dec BC
+	JP	PE,WRBWDAD1	; loop until done
+;
+; write lrcc eor and postamble
+;
+WRBPOST:
+	LD	HL,POSTAMBL-2	; point to postamble
+	LD	BC,9	; length
+WRBWRDY:
+	IN	A,(IMSR)	; get status
+	ADD	A	; TxRDY?
+	JP	P,WRBWRDY	; brif not
+	LD	A,(HL)	; get a byte
+	OUT	(OPCIDR),A	; output it
+	CPI		; inc HL, dec BC
+	JP	PE,WRBWRDY	; loop until done
+WRBWRDY1:
+	IN	A,(IMSR)	; get status
+	ADD	A	; TxRDY?
+	JP	P,WRBWRDY1	; brif not
+;
+; turn off transmitter
+;
+	LD	A,4	; rxen only
+	OUT	(OPCICR),A
+;
+; make sure we have data detect if short block
+;
+	LD	A,(LEN+1)	; get msb of length
+	OR	A	; length greater than 256 bytes?
+	JR	NZ,WRBWLRC	; brif
+	LD	B,0	; else wait for data detect
+	CALL	WDAD
+;
+; check lrcc
+;
+WRBWLRC:
+	IN	A,(IMSR)	; get misc stat
+	RLCA		; RxRDY?
+	JP	C,WRBRLRC
+	ADD	A	; still have dad?
+	JP	M,WRBWLRC	; brif
+	JR	WRCRCERR	; should be WRCRCERR
+WRBRLRC:
+	IN	A,(IPCIDR)	; get byte
+WRBCLRC:
+	XOR	D	; test if lrcc
+	JP	NZ,WRBWLRC	; not
+;
+; check EORID
+;
+WRBWEOR:
+	IN	A,(IMSR)	; get misc stat
+	RLCA		; Rx$RDY?
+	JP	C,WRBREOR
+	ADD	A	; still have dad?
+	JP	M,WRBWEOR	; brif
+	JR	WRCRCERR	; should be WRCRCERR
+WRBREOR:
+	IN	A,(IPCIDR)	; get byte
+WRBCEOR:
+	CP	RID	; is it record id
+	JP	NZ,WRBCLRC	; not
+;
+; check RID
+;
+WRBWRID:
+	IN	A,(IMSR)	; get misc stat
+	RLCA		; Rx$RDY?
+	JP	C,WRBRRID
+	ADD	A	; still have dad?
+	JP	M,WRBWRID	; brif
+	JR	WRCRCERR	; should be WRCRCERR
+WRBRRID:
+	IN	A,(IPCIDR)	; get byte
+	CP	EORID	; is it eor
+	JP	NZ,WRBCEOR	; not
+;
+; test vertial parity
+;
+	IN	A,(IPCISR)	; get status
+	AND	0CH	; test error
+	JR	NZ,WRCRCERR	; brif error
+	IN	A,(IDEIS1)	; get status
+	AND	20H	; end of tape?
+	JR	Z,WRBDONE	; brif not
+	LD	A,5	; else
+	JR	WRBDONE
+WRCRCERR:
+	LD	A,4	; return code
+WRBDONE:
+	PUSH	AF	; save code
+	LD	A,10H	; reset pci
+	OUT	(OPCICR),A
+	LD	A,0F7H	; wen only
+	OUT	(ODEIL1),A
+	JP	RWDONE	; br to common routine
+ 
+WPRE:
+;
+; write preamble
+;
+	XOR	A	; first pci data
+	OUT	(OPCIDR),A
+	LD	A,37H	; rxen,rxen,re,dtr
+	OUT	(OPCICR),A
+	LD	B,7	; len
+	LD	HL,PREAMBLE	; point to preamble
+WS:
+;
+; write preamble/postamble common
+;
+	LD	A,(HL)	; get byte
+	OUT	(OPCIDR),A	; write it
+WAITAMBL:
+	IN	A,(IMSR)	; get status
+	ADD	A	; test
+	JP	P,WAITAMBL	; wait until sent
+	INC	HL	; bump pointer
+	DJNZ	WS	; loop
+	RET		; return
+	SUBT	'Backspace/Forwardspace Record'
+BSR:
+;
+; backspace one record
+;
+	LD	A,0FEH	; rev*
+	JP	FSR+2	; go around forward space command
+FSR:
+	LD	A,0FDH	; fwd*
+	LD	D,A	; save it
+	CALL	CHKRDY	; wait for ready
+	RET	NZ	; ret if not ready
+	DI		; no interrupts while spacing
+	LD	A,D	; get direction
+	CALL	DCAC	; give command and check
+	LD	B,0	; return on data detect
+	CALL	WDAD
+	CALL	DLY2M	; wait 4 msec
+	CALL	DLY2M
+	IN	A,(IPCISR)	; get ipc status
+	ADD	A	; dad*?
+	JP	P,BSFSDONE	; else stop it
+	LD	B,40H	; return on no data detect
+	CALL	WDAD
+	LD	A,D	; get directon back
+	AND	1	; reverse?
+	JP	NZ,BSFSDONE	; brif not
+WAIT16M:
+	LD	B,32	; get 16 msec constant
+WAITDAD:
+	CALL	DLY500U
+	IN	A,(IPCISR)	; read pci status
+	AND	40H	; dad?
+	JP	NZ,WAIT16M	; brif
+	DJNZ	WAITDAD	; loop for the count
+BSFSDONE:
+;
+; stop the drive and exit
+;
+	LD	A,0FFH	; idle
+	OUT	(ODEIL1),A	; stop the drive
+	EI		; enable interrupts
+	IN	A,(IDEIS1)	; get drive status
+	AND	20H	; early warning?
+	RET	Z	; rif not
+	LD	A,5	; else flag
+	OR	A
+	RET
+	SUBT	'Write gap'
+GAP:
+;
+; test tape ready
+;
+	CALL	CHKRDY	; wait for drive ready
+	RET	NZ	; ret if not readu
+	CALL	CHKWPRT	; check write enabled
+	RET	NZ	; ret if write protected
+	DI		; no interrupts while writing
+	CALL	WENABLE	; write enable
+	LD	A,0F5H	; forward command + wen*
+	CALL	DCAC	; give command and check
+;
+; go erase 4 inches
+;
+	LD	B,66	; 132 msec = 4 inches
+ERASE:
+	CALL	DLY2M
+	DJNZ	ERASE
+WSTOP:
+;
+; stop the tape!
+;
+	LD	A,0F7H	; wen* only
+	OUT	(ODEIL1),A	; stop the drive
+	EI		; interrupts on
+	XOR	A	; no errors
+	RET
+	SUBT	'Write tape mark'
+WTM:
+	CALL	CHKRDY	; wait for drive ready
+	RET	NZ	; ret if not ready
+	CALL	CHKWPRT	; check write enabled
+	RET	NZ	; ret if writ protected
+	LD	A,TMID	; set record type
+	LD	(RTYPE),A
+	DI		; no interrupts while writing
+	CALL	WENABLE	; write enable
+	LD	A,0F5H	; wen* + fwd*
+	CALL	DCAC	; give command and check
+	CALL	WPASTLP	; get past load point
+	LD	B,30	; get 2" constant
+WTMW60M:
+	CALL	DLY2M
+	DJNZ	WTMW60M	; loop for count
+	CALL	WPRE	; write preamble
+	LD	BC,8	; send eor and zeros
+	LD	HL,POSTAMBL-1	; point to postamble
+WTMWPOST:
+	IN	A,(IMSR)	; get misc status
+	ADD	A	; TxRDY?
+	JP	P,WTMWPOST
+	LD	A,(HL)	; get a byte
+	OUT	(OPCIDR),A	; output it
+	CPI		; inc HL, dec BC
+	JP	PE,WTMWPOST	; loop until done
+WTMWRDY:
+	IN	A,(IMSR)	; get misc status
+	ADD	A	; TxRDY?
+	JP	P,WTMWRDY	; brif not
+	LD	A,4
+	OUT	(OPCICR),A	; stop write
+;
+; verify the file mark
+;
+	LD	B,0	; return on dad
+	CALL	WDAD	; look for data detect
+WTMWTM:
+	IN	A,(IMSR)	; get misc stat
+	RLCA		; Rx$RDY?
+	JP	C,WTMRTM
+	ADD	A	; still have dad?
+	JP	M,WTMWTM	; brif
+	JR	WTMCRCE	; else
+WTMRTM:
+	IN	A,(IPCIDR)	; get byte
+	XOR	TMID	; file mark?
+	JR	Z,WTMDONE	; brif
+WTMCRCE:
+	LD	A,4	; error code
+WTMDONE:
+	PUSH	AF	; save result
+	CALL	WSTOP	; do normal stop
+	POP	AF	; restore result
+	EI		; allow interupts again
+	OR	A	; test return code
+	RET
+	SUBT	'Fast Forward to end of Tape'
+FST:
+;
+; fast forward to end of tape
+;
+	LD	A,0F9H	;fast forward command
+	LD	D,A	;save it
+	CALL	CHKRDY	;wait for ready
+	RET	NZ	;return if not ready
+	LD	A,D	;get fast forward command
+	CALL	DCAC	;
+	OR	A	;see if not ready
+	RET	NZ	;return not ready
+.ENDLP:
+	CALL	GETST	; get current status
+	BIT	2,A	;see if busy
+	JR	NZ,.NEXTST	;yes see if done
+	CALL	RSTP	;stop drive
+	LD	A,1	;return not ready
+	RET
+.NEXTST:
+	BIT	4,A	;see if EOT
+	JR	Z,.ENDLP	;if not loop
+	CALL	RSTP	;stop drive
+	XOR	A	;clear a
+	INC	A	;set not zero
+	LD	A,5	;end of tape
+	RET
+ 
+	SUBT	'Get tape status'
+GETST:
+;
+; return coded status in A:
+;
+; bit    meaning if high
+;  7     selected
+;  6     ready
+;  5     BOT
+;  4     EOT
+;  3     write protected
+;  2     busy
+;  1&0   max number of tracks (base zero)
+;
+;  D     has last unit selected
+;  E     has last track selected
+;
+	IN	A,(IDEIS1)	; get status (physical)
+	LD	D,A	; save
+	LD	A,3	; 4 tracks (base 0)
+	BIT	$SLD,D	; test select
+	JR	Z,$+4	; not
+	SET	7,A
+	BIT	$RDY,D	; test ready
+	JR	Z,$+4
+	SET	6,A
+	BIT	$LPS,D	; test load point
+	JR	Z,$+4
+	SET	5,A
+	BIT	$EWS,D	; test early warn
+	JR	Z,$+4
+	SET	4,A
+	BIT	$FUP,D	; test protected
+	JR	NZ,$+4
+	SET	3,A
+	BIT	$BSY,D	; test motion
+	JR	Z,$+4
+	SET	2,A
+	LD	DE,(UNITTRK)	; get track & unit
+	RET		; return
+	SUBT	'Miscellaneous Routines'
+RSTP:
+;
+; stop drive motion
+;
+	LD	B,40H	; return on dad*
+	CALL	WDAD
+	LD	A,0FFH	; idle
+	OUT	(ODEIL1),A
+	RET
+WDAD:
+	IN	A,(IPCISR)	; get pci status
+	AND	40H	; dcd=dad*
+	XOR	B	; caller option
+	JP	NZ,WDAD1	; if good, verify after wait
+	IN	A,(IDEIS1)	; get dei status
+	AND	2	; busy?
+	JP	NZ,WDAD	; brif
+	SCF		; flag error
+	RET
+WDAD1:
+	LD	A,10	; wait 100 usec
+	CALL	DLY10U
+	IN	A,(IPCISR)	; read status again
+	AND	40H	; still have dcd?
+	XOR	B
+	RET	NZ	; ret if
+	JP	WDAD	; else try again
+WENABLE:
+;
+; write sequence 1--start writing
+;
+	LD	A,0F7H	; wen*
+	OUT	(ODEIL1),A
+;	LD	A,10H	; reset pci errors
+	XOR	A
+	OUT	(OPCICR),A
+	CALL	DLY2M	; wait 2 msec
+	RET
+WPASTLP:
+;
+; write sequence 2--get past load point
+;
+	IN	A,(IDEIS1)	; get status
+	AND	40H	; check lps
+	JP	NZ,WPASTLP	; skip over load point
+	LD	B,86	; init 43 msec. constant
+WAIT43M:
+	CALL	DLY500U	; wait
+	DJNZ	WAIT43M
+	RET
+DLY2M:
+;
+; delay 2 msec
+;
+	LD	A,200
+DLY10U:
+;
+; delay 10 usec
+;
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	DEC	A
+	JR	NZ,DLY10U
+	RET
+DLY500U:
+;
+; delay 500 usec
+;
+	LD	A,50
+	JP	DLY10U
+CHKRDY:
+;
+; wait for drive ready
+;
+	IN	A,(IPCICR)	; clear MR1
+	LD	A,MSYN1	; revert to single sync
+	OUT	(OPCIMR),A
+	IN	A,(IDEIS1)	; read drive status
+	AND	81H	; ready and sld?
+	CP	81H
+	JR	Z,CHKRDY1	; brif
+	LD	A,1	; else set return code
+	RET
+CHKRDY1:
+	IN	A,(IDEIS1)	; get status again
+	AND	2	; busy?
+	JR	NZ,CHKRDY1	; brif
+	IN	A,(IDEIS1)	; get dei status
+	AND	4	; previously writing?
+	JR	Z,NOTWRT	; brif not
+	LD	A,0FEH	; unlatch erase f/f
+	OUT	(ODEIL1),A
+	LD	A,0FFH	; drive idle
+	OUT	(ODEIL1),A
+	CALL	DLY10U	; allow command to take
+CHKRDY2:
+	IN	A,(IDEIS1)	; wait until not busy
+	AND	2
+	JP	NZ,CHKRDY2
+NOTWRT:
+	CALL	DLY2M	; wait 2 msec
+	XOR	A
+	RET
+CHKWPRT:
+;
+; check write enabled
+;
+	IN	A,(IDEIS1)	; get drive status
+	AND	8	; fup?
+	XOR	8
+	RET	Z	; ret if not protected
+	LD	A,5	; return code
+	RET
+DCAC:
+;
+; give command to drive and check
+;
+	OUT	(ODEIL1),A	; select drive
+	LD	A,2	; wait 20 usec
+	CALL	DLY10U
+	IN	A,(IDEIS1)	; get drive status
+	AND	2	; busy?
+	XOR	2
+	RET	Z	; ret if
+	LD	A,1	; else not ready
+	OR	A
+	RET
+ 
+RWCOM:
+;
+; read/write common initialization
+;
+	LD	A,D	; get msb of length
+	OR	A	; test zero
+	JR	NZ,OK	; brif ok
+	LD	A,E
+	CP	80
+	JR	NC,OK	; brif ok
+	LD	E,80	; min block length
+OK:
+;
+; check ready
+;
+	CALL	CHKRDY
+	RET	NZ	; ret if not ready
+;
+; save regs
+;
+	LD	(LEN),DE
+	LD	(MEM),HL
+	EX	(SP),HL	; save hl and get return addr
+	PUSH	BC	; save bc,de
+	PUSH	DE
+	JP	(HL)	; return to calling routine
+	SUBT	'Storage'
+;
+; preamble/postamble
+;
+LRCC:	DS	1
+RTYPE:	DC	RID
+POSTAMBL:	DC	EORID,0
+PREAMBLE:	DC	0,0,0,0,0,DSID,PSID
+;
+; miscellaneous
+;
+LEN:	DS	2
+MEM:	DS	2
+UNITTRK:	DC	(0FFFFH)
+	SUBT	'Port and Bit Definitions'
+;
+; DEI Output Latch 2
+;
+ODEIL2:	EQU	AECBASE+4	; output low true
+$SL4:	EQU	7	; unit select x4
+$TR2:	EQU	6	; track select x2
+$TR1:	EQU	5	; track select x1
+$SL2:	EQU	4	; unit select x2
+$SL1:	EQU	3	; unit select x1
+$LED2:	EQU	1	; lamp 2
+$LED1:	EQU	0	; lamp 1
+;
+; DEI Output Latch 1
+;
+ODEIL1:	EQU	AECBASE+5	; output low true
+$SLG:	EQU	7	; high to enable
+$RWD:	EQU	5	; rewind
+$WEN:	EQU	3	; write enable
+$HSP:	EQU	2	; high speed
+$FWD:	EQU	1	; forward
+$REV:	EQU	0	; reverse
+;
+; DEI Status Port
+;
+IDEIS1:	EQU	AECBASE	; input high true
+$RDY:	EQU	7	; ready
+$LPS:	EQU	6	; load point sensed
+$EWS:	EQU	5	; early warning sensed
+$FLG:	EQU	4	; rewind has occurred
+$FUP:	EQU	3	; file unprotected
+$WND:	EQU	2	; write logic on
+$BSY:	EQU	1	; busy
+$SLD:	EQU	0	; selected
+;
+; Miscellaneous Status
+;
+IMSR:	EQU	AECBASE+1	; input high true
+$RXRDY:	EQU	7	; receive ready
+$TXRDY:	EQU	6	; transmit ready
+$DAD:	EQU	5	; data detect
+$PASS:	EQU	4	; pass through bit
+;
+; PCI ports
+;
+OPCIDR:	EQU	AECBASE+12	; output data
+OPCISR:	EQU	AECBASE+13	; output sync
+OPCIMR:	EQU	AECBASE+14	; output mode
+OPCICR:	EQU	AECBASE+15	; output command
+IPCIDR:	EQU	AECBASE+8	; input data
+IPCISR:	EQU	AECBASE+9	; input status
+IPCIMR:	EQU	AECBASE+10	; input mode
+IPCICR:	EQU	AECBASE+11	; input command
+;
+;
+; physical record id's
+;
+TMID:	EQU	55H	; file mark
+RID:	EQU	22H	; normal record id
+EORID:	EQU	01H	; normal end of record id
+DSID:	EQU	08H	; dei sync byte
+PSID:	EQU	0FFH	; pci sync byte
+MSYN1:	EQU	0BCH	; single sync mode for pci
+MSYN2:	EQU	3CH	; double sync mode for pci
+	ENDM
